@@ -427,9 +427,16 @@ class Timeline(object):
     tid = nodestats.thread_id
     inputs = []
     if is_gputrace:
+    #   print("Node:", nodestats.node_name)
+    #   print("Queued:", nodestats.op_queued_rel_micros)
+    #   print("submitted:", nodestats.op_submitted_rel_micros)
       # Node names should always have the form 'name:op'.
       fields = node_name.split(':') + ['unknown']
       node_name, op = fields[:2]
+      args = {'name': node_name, 'op': op}
+      q = nodestats.op_queued_rel_micros/1000
+      if q != 0:
+          self._chrome_trace.emit_region(q, start-q, 69, tid, 'Op', op, args)
     elif node_name == 'RecvTensor':
       # RPC tracing does not use the standard timeline_label format.
       op = 'RecvTensor'
