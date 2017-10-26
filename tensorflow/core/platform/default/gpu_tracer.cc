@@ -333,6 +333,8 @@ class GPUTracerImpl : public GPUTracer,
   struct KernelRecord {
     uint64_t start_timestamp;
     uint64_t end_timestamp;
+    uint64_t queud_timestamp;
+    uint64_t submitted_timestamp;
     uint32 device_id;
     uint32 stream_id;
     uint32 correlation_id;
@@ -414,6 +416,7 @@ Status GPUTracerImpl::Start() {
 
   // Register as a TraceEngine to receive ScopedAnnotations.
   port::Tracing::RegisterEngine(this);
+  CUPTI_CALL(ActivityEnableLatencyTimestamps(true));
 
   // Intercept launch and memcpy calls to capture the Op name annotation.
   // TODO(pbar) Add callbacks for memcpy variants.
@@ -561,8 +564,14 @@ void GPUTracerImpl::ActivityCallback(const CUpti_Activity &record) {
     case CUPTI_ACTIVITY_KIND_KERNEL:
     case CUPTI_ACTIVITY_KIND_CONCURRENT_KERNEL: {
       if (kernel_records_.size() >= kMaxRecords) return;
-      auto *kernel = reinterpret_cast<const CUpti_ActivityKernel3 *>(&record);
+      auto *kernel = reinterpret_cast<const CUpti_ActivityKernel4 *>(&record);
+      uint64_t tmp = kernel->submitted;
+      if(tmp == CUPTI_TIMESTAMP_UNKNOWN)
+      std::cout << "-----------------------------------------------" << std::endl;
+      else
+      std::cout << "+++++++++++++++++++++++++++++++++++++++++++++++" << std::endl;
       kernel_records_.push_back(KernelRecord{kernel->start, kernel->end,
+                                             kernel->queued, kernel->submitted,
                                              kernel->deviceId, kernel->streamId,
                                              kernel->correlationId});
       break;
@@ -598,6 +607,8 @@ Status GPUTracerImpl::Collect(StepStatsCollector *collector) {
     ns->set_op_end_rel_micros(elapsed_us);
     ns->set_all_end_rel_micros(elapsed_us);
     ns->set_node_name(name);
+    ns->set_op_queued_rel_micros(rec.queud_timestamp);
+    ns->set_op_submitted_rel_micros(rec.submitted_timestamp);
     // TODO(pbar) Generate details based on the kernel activity record.
     // ns->set_timeline_label(details);
     auto nscopy = new NodeExecStats;

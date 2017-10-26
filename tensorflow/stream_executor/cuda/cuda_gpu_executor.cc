@@ -430,6 +430,7 @@ void CUDAExecutor::VlogOccupancyInfo(const KernelBase &kernel,
 }
 
 void *CUDAExecutor::Allocate(uint64 size) {
+    std::cout << "GPU ALLOCATION : " << size << std::endl;
   return CUDADriver::DeviceAllocate(context_, size);
 }
 
@@ -492,6 +493,7 @@ bool CUDAExecutor::SynchronousMemSet(DeviceMemoryBase *location, int value,
 port::Status CUDAExecutor::SynchronousMemcpy(DeviceMemoryBase *gpu_dst,
                                              const void *host_src,
                                              uint64 size) {
+  std::cout << "SYNC GPU MEMCP H2D : " << size << std::endl;
   return CUDADriver::SynchronousMemcpyH2D(context_, AsCudaDevicePtr(gpu_dst),
                                           host_src, size);
 }
@@ -499,6 +501,7 @@ port::Status CUDAExecutor::SynchronousMemcpy(DeviceMemoryBase *gpu_dst,
 port::Status CUDAExecutor::SynchronousMemcpy(void *host_dst,
                                              const DeviceMemoryBase &gpu_src,
                                              uint64 size) {
+ std::cout << "SYNC GPU MEMCP D2H : " << size << std::endl;
   return CUDADriver::SynchronousMemcpyD2H(context_, host_dst,
                                           AsCudaDevicePtr(gpu_src), size);
 }
@@ -543,6 +546,7 @@ bool CUDAExecutor::Memset32(Stream *stream, DeviceMemoryBase *location,
 
 bool CUDAExecutor::Memcpy(Stream *stream, void *host_dst,
                           const DeviceMemoryBase &gpu_src, uint64 size) {
+  std::cout << "ASYNC GPU MEMCP D2H : " << size << std::endl;
   return CUDADriver::AsynchronousMemcpyD2H(context_, host_dst,
                                            AsCudaDevicePtr(gpu_src), size,
                                            AsCUDAStreamValue(stream));
@@ -550,6 +554,7 @@ bool CUDAExecutor::Memcpy(Stream *stream, void *host_dst,
 
 bool CUDAExecutor::Memcpy(Stream *stream, DeviceMemoryBase *gpu_dst,
                           const void *host_src, uint64 size) {
+  std::cout << "ASYNC GPU MEMCP H2D : " << size << std::endl;
   return CUDADriver::AsynchronousMemcpyH2D(context_, AsCudaDevicePtr(gpu_dst),
                                            host_src, size,
                                            AsCUDAStreamValue(stream));
@@ -559,6 +564,7 @@ bool CUDAExecutor::MemcpyDeviceToDevice(Stream *stream,
                                         DeviceMemoryBase *gpu_dst,
                                         const DeviceMemoryBase &gpu_src,
                                         uint64 size) {
+std::cout << "ASYNC GPU MEMCP D2D : " << size << std::endl;
   return CUDADriver::AsynchronousMemcpyD2D(context_, AsCudaDevicePtr(gpu_dst),
                                            AsCudaDevicePtr(gpu_src), size,
                                            AsCUDAStreamValue(stream));

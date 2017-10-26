@@ -33,7 +33,7 @@ namespace profiler {
 class CuptiWrapper {
  public:
   CuptiWrapper() {}
-
+  CUptiResult ActivityEnableLatencyTimestamps(bool val);
   // CUPTI activity API
   CUptiResult ActivityDisable(CUpti_ActivityKind kind);
 

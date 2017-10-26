@@ -62,8 +62,13 @@ LIBCUPTI_WRAP(cuptiEnableCallback);
 LIBCUPTI_WRAP(cuptiEnableDomain);
 LIBCUPTI_WRAP(cuptiSubscribe);
 LIBCUPTI_WRAP(cuptiUnsubscribe);
+LIBCUPTI_WRAP(cuptiActivityEnableLatencyTimestamps);
 
 }  // namespace dynload
+
+CUptiResult CuptiWrapper::ActivityEnableLatencyTimestamps(bool val) {
+    return dynload::cuptiActivityEnableLatencyTimestamps(val);
+}
 
 CUptiResult CuptiWrapper::ActivityDisable(CUpti_ActivityKind kind) {
   return dynload::cuptiActivityDisable(kind);

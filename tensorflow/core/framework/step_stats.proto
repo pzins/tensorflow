@@ -59,6 +59,8 @@ message NodeExecStats {
   int64 op_start_rel_micros = 3;
   int64 op_end_rel_micros = 4;
   int64 all_end_rel_micros = 5;
+  int64 op_queued_rel_micros = 13;
+  int64 op_submitted_rel_micros = 14;
   repeated AllocatorMemoryUsed memory = 6;
   repeated NodeOutput output = 7;
   string timeline_label = 8;
