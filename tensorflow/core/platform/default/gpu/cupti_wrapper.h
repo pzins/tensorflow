@@ -33,7 +33,7 @@ namespace profiler {
 class CuptiWrapper {
  public:
   CuptiWrapper() {}
-  CUptiResult ActivityEnableLatencyTimestamps(bool val);
+
   // CUPTI activity API
   CUptiResult ActivityDisable(CUpti_ActivityKind kind);
 
@@ -68,8 +68,27 @@ class CuptiWrapper {
                         CUpti_CallbackFunc callback, void* userdata);
 
   CUptiResult Unsubscribe(CUpti_SubscriberHandle subscriber);
-};
 
+
+
+  // new
+  CUptiResult MetricGetIdFromName ( CUdevice device, const char* metricName, CUpti_MetricID* metric );
+  CUptiResult MetricGetNumProperties ( CUpti_MetricID metric, uint32_t* numProp );
+  CUptiResult MetricGetNumEvents(CUpti_MetricID metric, uint32_t* numEvents);
+  CUptiResult MetricCreateEventGroupSets ( CUcontext context, size_t metricIdArraySizeBytes, CUpti_MetricID* metricIdArray, CUpti_EventGroupSets** eventGroupPasses );
+  CUptiResult MetricGetValue ( CUdevice device, CUpti_MetricID metric, size_t eventIdArraySizeBytes, CUpti_EventID* eventIdArray, size_t eventValueArraySizeBytes, uint64_t* eventValueArray, uint64_t timeDuration, CUpti_MetricValue* metricValue );
+  CUptiResult MetricGetAttribute ( CUpti_MetricID metric, CUpti_MetricAttribute attrib, size_t* valueSize, void* value );
+  CUptiResult SetEventCollectionMode(CUcontext context, CUpti_EventCollectionMode mode);
+  CUptiResult EventGroupSetAttribute(CUpti_EventGroup eventGroup, CUpti_EventGroupAttribute attrib, size_t valueSize, void* value);
+  CUptiResult EventGroupEnable(CUpti_EventGroup eventGroup);
+  CUptiResult DeviceGetEventDomainAttribute(CUdevice device, CUpti_EventDomainID eventDomain, CUpti_EventDomainAttribute attrib, size_t* valueSize, void* value);
+  CUptiResult EventGroupGetAttribute(CUpti_EventGroup eventGroup, CUpti_EventGroupAttribute attrib, size_t* valueSize, void* value);
+  CUptiResult EventGroupReadEvent(CUpti_EventGroup eventGroup, CUpti_ReadEventFlags flags, CUpti_EventID event, size_t* eventValueBufferSizeBytes, uint64_t* eventValueBuffer);
+  CUptiResult EventGroupDisable(CUpti_EventGroup eventGroup);
+  CUptiResult EventGetAttribute(CUpti_EventID event, CUpti_EventAttribute attrib, size_t* valueSize, void* value);
+  CUptiResult ActivityEnableLatencyTimestamps(uint8_t enable);
+
+};
 }  // namespace profiler
 }  // namespace gputools
 }  // namespace perftools
