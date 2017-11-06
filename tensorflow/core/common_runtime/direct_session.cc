@@ -560,7 +560,8 @@ Status DirectSession::Run(const RunOptions& run_options,
     tracer = CreateGPUTracer();
     // tracer will be NULL on non-GPU platforms.
     // TODO(b/32704451): Don't just ignore the ::tensorflow::Status object!
-    if (tracer) tracer->Start().IgnoreError();
+    if (tracer)
+        std::cout << "result start " << (tracer->Start()== Status::OK()) << std::endl;
   }
 #endif  // GOOGLE_CUDA
 
@@ -596,7 +597,6 @@ Status DirectSession::Run(const RunOptions& run_options,
     mutex_lock l(run_state.mu_);
     run_state.status.Update(errors::Cancelled("Run call was cancelled"));
   }
-
 #if GOOGLE_CUDA
   if (tracer) {
     // TODO(b/32704451): Don't just ignore the ::tensorflow::Status object!

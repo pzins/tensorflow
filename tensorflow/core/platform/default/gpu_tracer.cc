@@ -430,6 +430,8 @@ getMetricValueCallback(void *userdata, CUpti_CallbackDomain domain,
                        CUpti_CallbackId cbid, const CUpti_CallbackData *cbInfo)
 {
     std::cout << "CALLback ###" << std::endl;
+
+
     // return;
     MetricData_t *metricData = (MetricData_t*)userdata;
     unsigned int i, j, k;
@@ -447,7 +449,8 @@ getMetricValueCallback(void *userdata, CUpti_CallbackDomain domain,
     if (cbInfo->callbackSite == CUPTI_API_ENTER) {
     cudaDeviceSynchronize();
     wrapper->SetEventCollectionMode(cbInfo->context, CUPTI_EVENT_COLLECTION_MODE_KERNEL);
-
+    std::cout << "numEventGroups size " << metricData->eventGroups->numEventGroups << std::endl;
+    std::cout << "KERNEL " << cbInfo->symbolName << std::endl;
     for (i = 0; i < metricData->eventGroups->numEventGroups; i++) {
       uint32_t all = 1;
       wrapper->EventGroupSetAttribute(metricData->eventGroups->eventGroups[i],
@@ -461,7 +464,6 @@ getMetricValueCallback(void *userdata, CUpti_CallbackDomain domain,
     // on exit, read and record event values
     if (cbInfo->callbackSite == CUPTI_API_EXIT) {
     cudaDeviceSynchronize();
-
     // for each group, read the event values from the group and record
     // in metricData
     for (i = 0; i < metricData->eventGroups->numEventGroups; i++) {
@@ -497,12 +499,14 @@ getMetricValueCallback(void *userdata, CUpti_CallbackDomain domain,
       valuesSize = sizeof(uint64_t) * numInstances;
       values = (uint64_t *)malloc(valuesSize);
 
+      metricData->eventIdx = 0;
       for (j = 0; j < numEvents; j++) {
         wrapper->EventGroupReadEvent(group, CUPTI_EVENT_READ_FLAG_NONE,
                                             eventIds[j], &valuesSize, values);
         if (metricData->eventIdx >= metricData->numEvents) {
           fprintf(stderr, "error: too many events collected, metric expects only %d\n",
                   (int)metricData->numEvents);
+          continue;
           exit(-1);
         }
 
@@ -549,7 +553,6 @@ getMetricValueCallback(void *userdata, CUpti_CallbackDomain domain,
     for (i = 0; i < metricData->eventGroups->numEventGroups; i++)
       wrapper->EventGroupDisable(metricData->eventGroups->eventGroups[i]);
     }
-
 }
 
 
@@ -593,6 +596,9 @@ Status GPUTracerImpl::Start() {
   }
   // There can only be one CUPTI subscriber.  If we can't create one then
   // there is another trace in progress (possibly by external code).
+
+  // return Status::OK();
+
   CUptiResult ret;
   ret = cupti_wrapper_->Subscribe(
       &subscriber_, static_cast<CUpti_CallbackFunc>(ApiCallback), this);
@@ -601,6 +607,10 @@ Status GPUTracerImpl::Start() {
   } else if (ret != CUPTI_SUCCESS) {
     return errors::Internal("Failed to create CUPTI subcriber.");
   }
+  std::cout << "success start : " << (res==CUPTI_SUCCESS) << std::endl;
+  std::cout << "success start : " << (res==CUPTI_ERROR_NOT_INITIALIZED) << std::endl;
+  std::cout << "success start : " << (res==CUPTI_ERROR_MAX_LIMIT_REACHED)<< std::endl;
+  std::cout << "success start : " << (res==CUPTI_ERROR_INVALID_PARAMETER)<< std::endl;
 
   // Register as a TraceEngine to receive ScopedAnnotations.
   port::Tracing::RegisterEngine(this);
@@ -642,55 +652,60 @@ Status GPUTracerImpl::Start() {
   CUPTI_CALL(GetTimestamp(&start_timestamp_));
   start_walltime_us_ = NowInUsec();
   enabled_ = true;
+
   return Status::OK();
 }
 
 Status GPUTracerImpl::Stop() {
+
   //metrics start -----------------------------------
- //  unsigned int pass;
- //  CUpti_MetricValue metricValue;
- //  // use all the collected events to calculate the metric value
- // CUPTI_CALL(cuptiMetricGetValue(CUDAdevice, metricId,
- //                                metricData.numEvents * sizeof(CUpti_EventID),
- //                                metricData.eventIdArray,
- //                                metricData.numEvents * sizeof(uint64_t),
- //                                metricData.eventValueArray,
- //                                kernelDuration, &metricValue));
- //
- // // print metric value, we format based on the value kind
- // {
- //   CUpti_MetricValueKind valueKind;
- //   size_t valueKindSize = sizeof(valueKind);
- //   CUPTI_CALL(cuptiMetricGetAttribute(metricId, CUPTI_METRIC_ATTR_VALUE_KIND,
- //                                      &valueKindSize, &valueKind));
- //   switch (valueKind) {
- //   case CUPTI_METRIC_VALUE_KIND_DOUBLE:
- //     printf("Metric %s = %f\n", metricName, metricValue.metricValueDouble);
- //     break;
- //   case CUPTI_METRIC_VALUE_KIND_UINT64:
- //     printf("Metric %s = %llu\n", metricName,
- //            (unsigned long long)metricValue.metricValueUint64);
- //     break;
- //   case CUPTI_METRIC_VALUE_KIND_INT64:
- //     printf("Metric %s = %lld\n", metricName,
- //            (long long)metricValue.metricValueInt64);
- //     break;
- //   case CUPTI_METRIC_VALUE_KIND_PERCENT:
- //     printf("Metric %s = %f%%\n", metricName, metricValue.metricValuePercent);
- //     break;
- //   case CUPTI_METRIC_VALUE_KIND_THROUGHPUT:
- //     printf("Metric %s = %llu bytes/sec\n", metricName,
- //            (unsigned long long)metricValue.metricValueThroughput);
- //     break;
- //   case CUPTI_METRIC_VALUE_KIND_UTILIZATION_LEVEL:
- //     printf("Metric %s = utilization level %u\n", metricName,
- //            (unsigned int)metricValue.metricValueUtilizationLevel);
- //     break;
- //   default:
- //     fprintf(stderr, "error: unknown value kind\n");
- //     exit(-1);
- //   }
- // }
+  unsigned int pass;
+  CUpti_MetricValue metricValue;
+  // use all the collected events to calculate the metric value
+ CUPTI_CALL(MetricGetValue(CUDAdevice, metricId,
+                                metricData.numEvents * sizeof(CUpti_EventID),
+                                metricData.eventIdArray,
+                                metricData.numEvents * sizeof(uint64_t),
+                                metricData.eventValueArray,
+                                0, &metricValue));
+                                //TODO kernelDuration instead of 0 normally
+
+ const char* metricName = "ipc";
+ // print metric value, we format based on the value kind
+ {
+   CUpti_MetricValueKind valueKind;
+   size_t valueKindSize = sizeof(valueKind);
+   CUPTI_CALL(MetricGetAttribute(metricId, CUPTI_METRIC_ATTR_VALUE_KIND,
+                                      &valueKindSize, &valueKind));
+   switch (valueKind) {
+   case CUPTI_METRIC_VALUE_KIND_DOUBLE:
+     printf("Metric %s = %f\n", metricName, metricValue.metricValueDouble);
+     break;
+   case CUPTI_METRIC_VALUE_KIND_UINT64:
+     printf("Metric %s = %llu\n", metricName,
+            (unsigned long long)metricValue.metricValueUint64);
+     break;
+   case CUPTI_METRIC_VALUE_KIND_INT64:
+     printf("Metric %s = %lld\n", metricName,
+            (long long)metricValue.metricValueInt64);
+     break;
+   case CUPTI_METRIC_VALUE_KIND_PERCENT:
+     printf("Metric %s = %f%%\n", metricName, metricValue.metricValuePercent);
+     break;
+   case CUPTI_METRIC_VALUE_KIND_THROUGHPUT:
+     printf("Metric %s = %llu bytes/sec\n", metricName,
+            (unsigned long long)metricValue.metricValueThroughput);
+     break;
+   case CUPTI_METRIC_VALUE_KIND_UTILIZATION_LEVEL:
+     printf("Metric %s = utilization level %u\n", metricName,
+            (unsigned int)metricValue.metricValueUtilizationLevel);
+     break;
+   default:
+     fprintf(stderr, "error: unknown value kind\n");
+     exit(-1);
+   }
+ }
+ return Status::OK();
 
   //metrics end --------------------------------------
   VLOG(1) << "GPUTracer::Stop";
