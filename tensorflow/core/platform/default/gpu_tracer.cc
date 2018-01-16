@@ -31,6 +31,8 @@ limitations under the License.
 #include "tensorflow/core/platform/mutex.h"
 #include "tensorflow/core/platform/tracing.h"
 
+#include <sys/time.h>
+#include <time.h>
 namespace {
 
 // Maps a MemcpyKind enum to a const string.
@@ -430,6 +432,18 @@ getMetricValueCallback(void *userdata, CUpti_CallbackDomain domain,
                        CUpti_CallbackId cbid, const CUpti_CallbackData *cbInfo)
 {
     std::cout << "CALLback ###" << std::endl;
+    if(domain == CUPTI_CB_DOMAIN_DRIVER_API) {
+        uint64_t tp;
+        if (cbInfo->callbackSite == CUPTI_API_ENTER) {
+            // GetTimestamp(&tp);
+            struct timeval time;
+            gettimeofday(&time, NULL); // Start Time
+            long totalTime = ((time.tv_sec * 1000) + (time.tv_usec / 1000));
+            printf("%d: %s\n", totalTime, cbInfo->functionName);
+        }
+        printf("++++++++++\n"   );
+        return;
+    }
 
 
     // return;
@@ -440,6 +454,7 @@ getMetricValueCallback(void *userdata, CUpti_CallbackDomain domain,
     // anything else.
     if (cbid != CUPTI_RUNTIME_TRACE_CBID_cudaLaunch_v3020) {
     printf("%s:%d: unexpected cbid %d\n", __FILE__, __LINE__, cbid);
+    return;
     exit(-1);
     }
 
@@ -572,6 +587,7 @@ Status GPUTracerImpl::Start() {
   CUPTI_CALL(Subscribe(&subscriber, (CUpti_CallbackFunc)getMetricValueCallback, &metricData));
   CUPTI_CALL(EnableCallback(1, subscriber, CUPTI_CB_DOMAIN_RUNTIME_API,
                                  CUPTI_RUNTIME_TRACE_CBID_cudaLaunch_v3020));
+ CUPTI_CALL(EnableDomain(1, subscriber, CUPTI_CB_DOMAIN_RUNTIME_API));
 
   // allocate space to hold all the events needed for the metric
   CUPTI_CALL(MetricGetIdFromName(CUDAdevice, metricName, &metricId));
