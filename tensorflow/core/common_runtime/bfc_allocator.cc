@@ -12,7 +12,8 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
-
+#include <sstream>
+#include "tensorflow/core/tensorflowTracer.h"
 #include <atomic>
 
 #include "tensorflow/core/common_runtime/bfc_allocator.h"
@@ -170,14 +171,17 @@ bool BFCAllocator::Extend(size_t rounded_bytes) {
 }
 
 BFCAllocator::ChunkHandle BFCAllocator::AllocateChunk() {
+    tracepoint(tensorflowTracer, allocate_chunk_entry, "");
   if (free_chunks_list_ != kInvalidChunkHandle) {
     ChunkHandle h = free_chunks_list_;
     Chunk* c = ChunkFromHandle(h);
     free_chunks_list_ = c->next;
+    tracepoint(tensorflowTracer, allocate_chunk_entry, "");
     return h;
   } else {
     ChunkHandle h = chunks_.size();
     chunks_.resize(h + 1);
+    tracepoint(tensorflowTracer, allocate_chunk_exit, "");
     return h;
   }
 }
@@ -256,7 +260,12 @@ void* BFCAllocator::AllocateRawInternal(size_t unused_alignment,
 
   mutex_lock l(lock_);
   void* ptr = FindChunkPtr(bin_num, rounded_bytes, num_bytes);
+  std::stringstream ss;
+  ss<<ptr;
+  std::string s = "AllocateRawInternal_" + std::to_string(num_bytes) + "_" + ss.str();
+  tracepoint(tensorflowTracer, allocate_raw_internal_entry, s.c_str());
   if (ptr != nullptr) {
+      tracepoint(tensorflowTracer, allocate_raw_internal_exit, s.c_str());
     return ptr;
   }
 
@@ -264,6 +273,7 @@ void* BFCAllocator::AllocateRawInternal(size_t unused_alignment,
   if (Extend(rounded_bytes)) {
     ptr = FindChunkPtr(bin_num, rounded_bytes, num_bytes);
     if (ptr != nullptr) {
+      tracepoint(tensorflowTracer, allocate_raw_internal_exit, s.c_str());
       return ptr;
     }
   }
@@ -278,6 +288,7 @@ void* BFCAllocator::AllocateRawInternal(size_t unused_alignment,
     DumpMemoryLog(rounded_bytes);
     LOG(WARNING) << RenderOccupancy();
   }
+  tracepoint(tensorflowTracer, allocate_raw_internal_exit, s.c_str());
   return nullptr;
 }
 
@@ -377,8 +388,13 @@ void BFCAllocator::DeallocateRaw(void* ptr) {
 }
 
 void BFCAllocator::DeallocateRawInternal(void* ptr) {
+  std::stringstream ss;
+  ss<<ptr;
+  std::string s = "DeallocateRawInternal_" + ss.str();
+  tracepoint(tensorflowTracer, deallocate_raw_internal_entry, s.c_str());
   if (ptr == nullptr) {
     LOG(ERROR) << "tried to deallocate nullptr";
+    tracepoint(tensorflowTracer, deallocate_raw_internal_exit, s.c_str());
     return;
   }
   mutex_lock l(lock_);
@@ -393,6 +409,7 @@ void BFCAllocator::DeallocateRawInternal(void* ptr) {
   if (VLOG_IS_ON(4)) {
     LOG(INFO) << "F: " << RenderOccupancy();
   }
+  tracepoint(tensorflowTracer, deallocate_raw_internal_exit, s.c_str());
 }
 
 // Merges h1 and h2 when Chunk(h1)->next is h2 and Chunk(h2)->prev is c1.

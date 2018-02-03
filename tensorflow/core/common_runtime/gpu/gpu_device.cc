@@ -18,8 +18,9 @@ limitations under the License.
 #if GOOGLE_CUDA
 
 #define EIGEN_USE_GPU
-
+#include "tensorflow/core/tensorflowTracer.h"
 #include "tensorflow/core/common_runtime/gpu/gpu_device.h"
+#include "tensorflow/core/common_runtime/bfc_allocator.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -400,6 +401,8 @@ Status BaseGPUDevice::FillContextMap(const Graph* graph,
 }
 
 void BaseGPUDevice::Compute(OpKernel* op_kernel, OpKernelContext* context) {
+
+
   // ScopedActivity is cheap when tracing is not active, but we
   // can avoid computing the Hash64.
   // TODO(pbar) This would no longer be needed if Ops have a unique id.
@@ -430,6 +433,10 @@ void BaseGPUDevice::Compute(OpKernel* op_kernel, OpKernelContext* context) {
 
 void BaseGPUDevice::ComputeHelper(OpKernel* op_kernel,
                                   OpKernelContext* context) {
+  AllocatorStats s;
+  dynamic_cast<BFCAllocator*>(gpu_allocator_)->GetStats(&s);
+  std::string tmp = std::to_string(s.bytes_in_use) + "_" + std::to_string(s.num_allocs);
+  tracepoint(tensorflowTracer, gpu_device_compute_entry, tmp.c_str());
   GPUDeviceContext* gpu_device_context = device_contexts_[0];
   if (context->op_device_context() != nullptr) {
     gpu_device_context =
@@ -490,6 +497,8 @@ void BaseGPUDevice::ComputeHelper(OpKernel* op_kernel,
       context->SetStatus(GPUUtil::SyncAll(this));
     }
   }
+  tracepoint(tensorflowTracer, gpu_device_compute_exit, tmp.c_str());
+
 }
 
 void BaseGPUDevice::ConsumeListOfAccessedTensors(
