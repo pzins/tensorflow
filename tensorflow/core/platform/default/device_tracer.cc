@@ -176,8 +176,8 @@ Status CUPTIManager::EnableTrace(CUPTIClient *client) {
   // TODO(pbar) Work out the minimal set to trace.
   // We can currently manage without driver/runtime tracing.
   // CUPTI_CALL(ActivityEnable(CUPTI_ACTIVITY_KIND_CONTEXT));
-  // CUPTI_CALL(ActivityEnable(CUPTI_ACTIVITY_KIND_DRIVER));
-  // CUPTI_CALL(ActivityEnable(CUPTI_ACTIVITY_KIND_RUNTIME));
+  CUPTI_CALL(ActivityEnable(CUPTI_ACTIVITY_KIND_DRIVER));
+  CUPTI_CALL(ActivityEnable(CUPTI_ACTIVITY_KIND_RUNTIME));
   // These might be useful for annotations but require NVTX API.
   // CUPTI_CALL(ActivityEnable(CUPTI_ACTIVITY_KIND_NAME));
   // CUPTI_CALL(ActivityEnable(CUPTI_ACTIVITY_KIND_MARKER));
@@ -537,6 +537,14 @@ void DeviceTracerImpl::ActivityCallback(const CUpti_Activity &record) {
   VLOG(2) << "ActivityCallback " << record.kind;
   mutex_lock l(trace_mu_);
   switch (record.kind) {
+    case CUPTI_ACTIVITY_KIND_DRIVER: {
+      CUpti_ActivityAPI *api = (CUpti_ActivityAPI *) &record;
+      printf("DRIVER cbid=%u process %u, thread %u, correlation %u\n", api->cbid, api->processId, api->threadId, api->correlationId);
+      break;}
+    case CUPTI_ACTIVITY_KIND_RUNTIME:{
+      CUpti_ActivityAPI *api = (CUpti_ActivityAPI *) &record;
+      printf("RUNTIME cbid=%u process %u, thread %u, correlation %u\n", api->cbid, api->processId, api->threadId, api->correlationId);
+      break;}
     case CUPTI_ACTIVITY_KIND_MEMCPY: {
       if (memcpy_records_.size() >= kMaxRecords) return;
       auto *memcpy = reinterpret_cast<const CUpti_ActivityMemcpy *>(&record);
