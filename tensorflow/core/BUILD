@@ -2230,6 +2230,7 @@ tf_cuda_library(
     srcs = tf_additional_device_tracer_srcs(),
     hdrs = [
         "platform/device_tracer.h",
+        "cuptiTracer.h"
     ],
     copts = tf_copts(),
     cuda_deps = tf_additional_cupti_wrapper_deps() + tf_additional_device_tracer_cuda_deps(),
@@ -2238,6 +2239,7 @@ tf_cuda_library(
         ":lib",
         ":protos_all_cc",
     ] + tf_additional_device_tracer_deps(),
+    linkopts = ["-ldl", "-llttng-ust"]
 )
 
 GPU_RUNTIME_HEADERS = [
