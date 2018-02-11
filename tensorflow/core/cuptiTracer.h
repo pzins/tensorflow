@@ -61,8 +61,68 @@ TRACEPOINT_EVENT(
     )
 )
 
+TRACEPOINT_EVENT(
+    cuptiTracer,
+    kernel_begin,
+    TP_ARGS(
+        const char*, my_string_arg,
+        uint64_t, timestamp
 
+    ),
+    TP_FIELDS(
+        ctf_string(name, my_string_arg)
+        ctf_integer(uint64_t, timestamp, timestamp)
 
+    )
+)
+
+TRACEPOINT_EVENT(
+    cuptiTracer,
+    kernel_end,
+    TP_ARGS(
+        const char*, my_string_arg,
+        uint64_t, timestamp
+
+    ),
+    TP_FIELDS(
+        ctf_string(name, my_string_arg)
+        ctf_integer(uint64_t, timestamp, timestamp)
+
+    )
+)
+
+TRACEPOINT_EVENT(
+    cuptiTracer,
+    memcpy_begin,
+    TP_ARGS(
+        const char*, my_string_arg,
+        const char*, my_string_arg2,
+        uint64_t, timestamp
+
+    ),
+    TP_FIELDS(
+        ctf_string(name, my_string_arg)
+        ctf_string(details, my_string_arg2)
+        ctf_integer(uint64_t, timestamp, timestamp)
+
+    )
+)
+TRACEPOINT_EVENT(
+    cuptiTracer,
+    memcpy_end,
+    TP_ARGS(
+        const char*, my_string_arg,
+        const char*, my_string_arg2,
+        uint64_t, timestamp
+
+    ),
+    TP_FIELDS(
+        ctf_string(name, my_string_arg)
+        ctf_string(details, my_string_arg2)
+        ctf_integer(uint64_t, timestamp, timestamp)
+
+    )
+)
 
 #endif
 

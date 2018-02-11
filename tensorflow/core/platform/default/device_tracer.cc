@@ -539,14 +539,14 @@ void DeviceTracerImpl::ActivityCallback(const CUpti_Activity &record) {
   switch (record.kind) {
     case CUPTI_ACTIVITY_KIND_DRIVER: {
       CUpti_ActivityAPI *api = (CUpti_ActivityAPI *) &record;
-      tracepoint(cuptiTracer, driver_api_entry, api->cbid, api->start);
-      tracepoint(cuptiTracer, driver_api_exit, api->cbid, api->end);
+      tracepoint(cuptiTracer, driver_api_entry, api->start, api->cbid);
+      tracepoint(cuptiTracer, driver_api_exit, api->end, api->cbid);
       printf("DRIVER cbid=%u process %u, thread %u, correlation %u\n", api->cbid, api->processId, api->threadId, api->correlationId);
       break;}
     case CUPTI_ACTIVITY_KIND_RUNTIME:{
       CUpti_ActivityAPI *api = (CUpti_ActivityAPI *) &record;
-      tracepoint(cuptiTracer, runtime_api_entry, api->cbid, api->start);
-      tracepoint(cuptiTracer, runtime_api_exit, api->cbid, api->end);
+      tracepoint(cuptiTracer, runtime_api_entry, api->start, api->cbid);
+      tracepoint(cuptiTracer, runtime_api_exit, api->end, api->cbid);
       printf("RUNTIME cbid=%u process %u, thread %u, correlation %u\n", api->cbid, api->processId, api->threadId, api->correlationId);
       break;}
     case CUPTI_ACTIVITY_KIND_MEMCPY: {
@@ -601,8 +601,8 @@ Status DeviceTracerImpl::Collect(StepStatsCollector *collector) {
     auto it = correlations_.find(rec.correlation_id);
     const string name = (it != correlations_.cend()) ? it->second : "unknown";
     NodeExecStats *ns = new NodeExecStats;
-    ns->set_all_start_micros(start_walltime_us_ +
-                             ((rec.start_timestamp - start_timestamp_) / 1000));
+    int64 start_time = start_walltime_us_ + ((rec.start_timestamp - start_timestamp_) / 1000);
+    ns->set_all_start_micros(start_time);
     ns->set_op_start_rel_micros(0);
     auto elapsed_us =
         std::max<int64>((rec.end_timestamp - rec.start_timestamp) / 1000, 1);
@@ -615,13 +615,15 @@ Status DeviceTracerImpl::Collect(StepStatsCollector *collector) {
     *nscopy = *ns;
     collector->Save(strings::StrCat(stream_device, "all"), ns);
     collector->Save(strings::StrCat(stream_device, rec.stream_id), nscopy);
+    tracepoint(cuptiTracer, kernel_begin, name.c_str(), start_time);
+    tracepoint(cuptiTracer, kernel_end, name.c_str(), elapsed_us + start_time);
   }
   for (const auto &rec : memcpy_records_) {
     auto it = correlations_.find(rec.correlation_id);
     const string name = (it != correlations_.cend()) ? it->second : "unknown";
     NodeExecStats *ns = new NodeExecStats;
-    ns->set_all_start_micros(start_walltime_us_ +
-                             ((rec.start_timestamp - start_timestamp_) / 1000));
+    int64 start_time = start_walltime_us_ + ((rec.start_timestamp - start_timestamp_) / 1000);
+    ns->set_all_start_micros(start_time);
     ns->set_op_start_rel_micros(0);
     auto elapsed_us =
         std::max<int64>((rec.end_timestamp - rec.start_timestamp) / 1000, 1);
@@ -640,6 +642,8 @@ Status DeviceTracerImpl::Collect(StepStatsCollector *collector) {
     *nscopy = *ns;
     collector->Save(memcpy_device, ns);
     collector->Save(strings::StrCat(stream_device, rec.stream_id), nscopy);
+    tracepoint(cuptiTracer, memcpy_begin, name.c_str(), details.c_str(), start_time);
+    tracepoint(cuptiTracer, memcpy_end, name.c_str(), details.c_str(), start_time + elapsed_us);
   }
   return Status::OK();
 }
