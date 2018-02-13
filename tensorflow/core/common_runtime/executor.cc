@@ -1612,8 +1612,7 @@ void ExecutorState::Process(TaggedNode tagged_node, int64 scheduled_usec) {
 
         auto done = [this, state]() {
           Device* device = impl_->params_.device;
-          std::string marker_name = "TF_kernel_async_" + device->name();
-          tracepoint(tensorflowTracer, operation_end, marker_name.c_str());
+          tracepoint(tensorflowTracer, async_operation_end, device->name().c_str(), state->tagged_node.node->name().c_str());
           NodeExecStatsWrapper* stats = state->stats;  // Shorthand
           Entry* first_input = state->first_input;     // Shorthand
 
@@ -1658,16 +1657,15 @@ void ExecutorState::Process(TaggedNode tagged_node, int64 scheduled_usec) {
         };
         nodestats::SetOpStart(stats);
         std::string marker_name = "TF_kernel_async_" + device->name();
-        tracepoint(tensorflowTracer, operation_start, marker_name.c_str());
+        tracepoint(tensorflowTracer, async_operation_start, device->name().c_str(), op_kernel->name().c_str());
         device->ComputeAsync(async, &state->ctx, done);
       } else {
         // Synchronous computes.
         OpKernelContext ctx(&params, item.num_outputs);
-        std::string marker_name = "TF_kernel_sync_" + device->name();
         nodestats::SetOpStart(stats);
-        tracepoint(tensorflowTracer, operation_start, marker_name.c_str());
+        tracepoint(tensorflowTracer, operation_start, device->name().c_str(), op_kernel->name().c_str());
         device->Compute(CHECK_NOTNULL(op_kernel), &ctx);
-        tracepoint(tensorflowTracer, operation_end, marker_name.c_str());
+        tracepoint(tensorflowTracer, operation_end, device->name().c_str(), op_kernel->name().c_str());
         nodestats::SetOpEnd(stats);
         s = ProcessOutputs(item, &ctx, &outputs, stats);
         if (s.ok() && impl_->device_record_tensor_accesses_) {
