@@ -138,7 +138,7 @@ string ResourceMgr::DebugString() const {
 
 Status ResourceMgr::DoCreate(const string& container, TypeIndex type,
                              const string& name, ResourceBase* resource) {
-  tracepoint(tensorflowTracer, do_create_entry, name.c_str());
+  tracepoint(tensorflowTracer, do_create_entry, name.c_str(), container.c_str());
   {
     mutex_lock l(mu_);
     Container** b = &containers_[container];
@@ -147,12 +147,12 @@ Status ResourceMgr::DoCreate(const string& container, TypeIndex type,
     }
     if ((*b)->insert({{type.hash_code(), name}, resource}).second) {
       TF_RETURN_IF_ERROR(InsertDebugTypeName(type.hash_code(), type.name()));
-      tracepoint(tensorflowTracer, do_create_exit, name.c_str());
+      tracepoint(tensorflowTracer, do_create_exit, name.c_str(), container.c_str(), 1);
       return Status::OK();
     }
   }
   resource->Unref();
-  tracepoint(tensorflowTracer, do_create_exit, name.c_str());
+  tracepoint(tensorflowTracer, do_create_exit, name.c_str(), container.c_str(), 0);
   return errors::AlreadyExists("Resource ", container, "/", name, "/",
                                type.name());
 }
@@ -211,7 +211,7 @@ Status ResourceMgr::Delete(const ResourceHandle& handle) {
 }
 
 Status ResourceMgr::Cleanup(const string& container) {
-  tracepoint(tensorflowTracer, cleanup_entry, container.c_str());
+    tracepoint(tensorflowTracer, cleanup_entry, container.c_str());
   Container* b = nullptr;
   {
     mutex_lock l(mu_);

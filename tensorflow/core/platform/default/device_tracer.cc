@@ -14,7 +14,7 @@ limitations under the License.
 ==============================================================================*/
 #include "tensorflow/core/cuptiTracer.h"
 #include "tensorflow/core/platform/device_tracer.h"
-
+#include <sstream>
 #if GOOGLE_CUDA
 
 #include <stdlib.h>
@@ -539,14 +539,18 @@ void DeviceTracerImpl::ActivityCallback(const CUpti_Activity &record) {
   switch (record.kind) {
     case CUPTI_ACTIVITY_KIND_DRIVER: {
       CUpti_ActivityAPI *api = (CUpti_ActivityAPI *) &record;
-      tracepoint(cuptiTracer, driver_api_entry, api->start, api->cbid);
-      tracepoint(cuptiTracer, driver_api_exit, api->end, api->cbid);
+      std::stringstream ss;
+      ss << api->cbid;
+      tracepoint(cuptiTracer, driver_api_entry, ss.str().c_str(), api->start);
+      tracepoint(cuptiTracer, driver_api_exit, ss.str().c_str(), api->end);
       printf("DRIVER cbid=%u process %u, thread %u, correlation %u\n", api->cbid, api->processId, api->threadId, api->correlationId);
       break;}
     case CUPTI_ACTIVITY_KIND_RUNTIME:{
       CUpti_ActivityAPI *api = (CUpti_ActivityAPI *) &record;
-      tracepoint(cuptiTracer, runtime_api_entry, api->start, api->cbid);
-      tracepoint(cuptiTracer, runtime_api_exit, api->end, api->cbid);
+      std::stringstream ss;
+      ss << api->cbid;
+      tracepoint(cuptiTracer, runtime_api_entry, ss.str().c_str(), api->start);
+      tracepoint(cuptiTracer, runtime_api_exit, ss.str().c_str(), api->end);
       printf("RUNTIME cbid=%u process %u, thread %u, correlation %u\n", api->cbid, api->processId, api->threadId, api->correlationId);
       break;}
     case CUPTI_ACTIVITY_KIND_MEMCPY: {
