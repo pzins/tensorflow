@@ -433,9 +433,6 @@ void BaseGPUDevice::Compute(OpKernel* op_kernel, OpKernelContext* context) {
 
 void BaseGPUDevice::ComputeHelper(OpKernel* op_kernel,
                                   OpKernelContext* context) {
-  AllocatorStats s;
-  dynamic_cast<BFCAllocator*>(gpu_allocator_)->GetStats(&s);
-  tracepoint(tensorflowTracer, gpu_device_compute_entry, op_kernel->name().c_str(), s.bytes_in_use, s.num_allocs);
   GPUDeviceContext* gpu_device_context = device_contexts_[0];
   if (context->op_device_context() != nullptr) {
     gpu_device_context =
@@ -496,7 +493,6 @@ void BaseGPUDevice::ComputeHelper(OpKernel* op_kernel,
       context->SetStatus(GPUUtil::SyncAll(this));
     }
   }
-  tracepoint(tensorflowTracer, gpu_device_compute_exit, op_kernel->name().c_str(), s.bytes_in_use, s.num_allocs);
 }
 
 void BaseGPUDevice::ConsumeListOfAccessedTensors(

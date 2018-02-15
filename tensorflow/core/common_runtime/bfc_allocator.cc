@@ -293,6 +293,21 @@ void* BFCAllocator::AllocateRawInternal(size_t unused_alignment,
 
 void* BFCAllocator::FindChunkPtr(BinNum bin_num, size_t rounded_bytes,
                                  size_t num_bytes) {
+
+  std::cout << "------------------------------------------" << std::endl;
+  for(auto i : chunks_) {
+      std::cout << "### " << Name()  << "  " << i.size << " " << i.requested_size << " " << i.allocation_id << std::endl;
+  }
+  ChunkHandle tmp = free_chunks_list_;
+  while(tmp != -1) {
+      BFCAllocator::Chunk* chunk = ChunkFromHandle(tmp);
+      std::cout << "@@@ " << Name() << "  "  << chunk->size << " " <<chunk->requested_size << " " << chunk->allocation_id << std::endl;
+      tmp = chunk->next;
+  }
+  std::cout << "------------------------------------------" << std::endl << std::endl;
+
+
+
   // First identify the first bin that could satisfy rounded_bytes.
   for (; bin_num < kNumBins; bin_num++) {
     // Start searching from the first bin for the smallest chunk that fits
@@ -334,6 +349,11 @@ void* BFCAllocator::FindChunkPtr(BinNum bin_num, size_t rounded_bytes,
         stats_.max_alloc_size =
             std::max<std::size_t>(stats_.max_alloc_size, chunk->size);
 
+        tracepoint(tensorflowTracer, find_chunk_ptr, "FindChunkPtr", Name().c_str(),
+                    stats_.num_allocs,
+                    stats_.bytes_in_use,
+                    stats_.max_bytes_in_use,
+                    stats_.max_alloc_size);
         VLOG(4) << "Returning: " << chunk->ptr;
         if (VLOG_IS_ON(4)) {
           LOG(INFO) << "A: " << RenderOccupancy();
@@ -387,12 +407,8 @@ void BFCAllocator::DeallocateRaw(void* ptr) {
 }
 
 void BFCAllocator::DeallocateRawInternal(void* ptr) {
-  std::stringstream ss;
-  ss<<ptr;
-  tracepoint(tensorflowTracer, deallocate_raw_internal_entry, "BFCAllocator::DeallocateRawInternal", ss.str().c_str());
   if (ptr == nullptr) {
     LOG(ERROR) << "tried to deallocate nullptr";
-    tracepoint(tensorflowTracer, deallocate_raw_internal_exit, "BFCAllocator::DeallocateRawInternal", ss.str().c_str(), 0);
     return;
   }
   mutex_lock l(lock_);
@@ -401,13 +417,18 @@ void BFCAllocator::DeallocateRawInternal(void* ptr) {
   BFCAllocator::ChunkHandle h = region_manager_.get_handle(ptr);
   CHECK(h != kInvalidChunkHandle);
 
+  Chunk* c = ChunkFromHandle(h);
+  std::stringstream ss;
+  ss<<ptr;
+  tracepoint(tensorflowTracer, deallocate_raw_internal_entry, "BFCAllocator::DeallocateRawInternal", ss.str().c_str(), -1*c->size);
   // Consider coalescing it.
   FreeAndMaybeCoalesce(h);
+
 
   if (VLOG_IS_ON(4)) {
     LOG(INFO) << "F: " << RenderOccupancy();
   }
-  tracepoint(tensorflowTracer, deallocate_raw_internal_exit, "BFCAllocator::DeallocateRawInternal", ss.str().c_str(), 1);
+  tracepoint(tensorflowTracer, deallocate_raw_internal_exit, "BFCAllocator::DeallocateRawInternal", ss.str().c_str(), -1*c->size);
 }
 
 // Merges h1 and h2 when Chunk(h1)->next is h2 and Chunk(h2)->prev is c1.
@@ -485,6 +506,11 @@ void BFCAllocator::FreeAndMaybeCoalesce(BFCAllocator::ChunkHandle h) {
 
   // Updates the stats.
   stats_.bytes_in_use -= c->size;
+  tracepoint(tensorflowTracer, find_chunk_ptr, "FindChunkPtr", Name().c_str(),
+          stats_.num_allocs,
+          stats_.bytes_in_use,
+          stats_.max_bytes_in_use,
+          stats_.max_alloc_size);
 
   // This chunk is no longer in-use, consider coalescing the chunk
   // with adjacent chunks.
