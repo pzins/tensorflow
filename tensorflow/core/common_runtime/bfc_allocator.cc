@@ -687,7 +687,7 @@ void BFCAllocator::Profile() {
         h = c->next;
       }
     }
-    if(Name().find("gpu") != std::string::npos) {
+    if(Name().find("gpu") != std::string::npos || Name().find("GPU") != std::string::npos) {
         tracepoint(tensorflowTracer, gpu_bfc_chunks_stats, Name().c_str(),
         total_bytes_in_use, total_requested_bytes_in_use, total_bytes_in_use - total_requested_bytes_in_use,
         total_bytes, total_requested_bytes, total_bytes - total_requested_bytes,
@@ -706,7 +706,7 @@ void BFCAllocator::Profile() {
        CHECK_EQ(b->free_chunks.size(),
                 bin_info.total_chunks_in_bin - bin_info.total_chunks_in_use);
 
-       if(Name().find("gpu") != std::string::npos) {
+       if(Name().find("gpu") != std::string::npos || Name().find("GPU") != std::string::npos) {
            tracepoint(tensorflowTracer, gpu_bfc_bins_stats, Name().c_str(), bin_num,
            bin_info.total_chunks_in_bin, bin_info.total_chunks_in_use,
            bin_info.total_bytes_in_bin, bin_info.total_bytes_in_use,
