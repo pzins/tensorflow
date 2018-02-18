@@ -125,6 +125,15 @@ class CUPTIClient {
     CUptiResult _status = cupti_wrapper_->call;                     \
     if (_status != CUPTI_SUCCESS) {                                 \
       LOG(ERROR) << "cuda call " << #call << " failed " << _status; \
+      std::cout << (_status==CUPTI_ERROR_NOT_INITIALIZED) \
+      << " " << (_status==CUPTI_ERROR_INVALID_EVENT_ID   ) \
+      << " " << (_status==CUPTI_ERROR_INVALID_METRIC_ID ) \
+      << " " << (_status==CUPTI_ERROR_INVALID_OPERATION)\
+<< " " << (_status==CUPTI_ERROR_PARAMETER_SIZE_NOT_SUFFICIENT)\
+<< " " << (_status==CUPTI_ERROR_INVALID_EVENT_VALUE)\
+<< " " << (_status==CUPTI_ERROR_INVALID_METRIC_VALUE)\
+<< " " << (_status==CUPTI_ERROR_INVALID_PARAMETER)\
+       << std::endl; \
     }                                                               \
   } while (0)
 
@@ -402,7 +411,7 @@ class DeviceTracerImpl : public DeviceTracer,
 
     CUcontext CUDAcontext;
     CUdevice CUDAdevice;
-    CUpti_SubscriberHandle subscriber;
+    // CUpti_SubscriberHandle subscriber;
     MetricData_t metricData;
     CUpti_MetricID metricId;
 };
@@ -573,16 +582,16 @@ Status DeviceTracerImpl::Start() {
     std::cout << "cuda device : " << (res==CUDA_SUCCESS) << std::endl;
 
     //variables ----------------------------------------------
-    const char *metricName = "sm_efficiency";
+    const char *metricName = "dram_read_throughput";
     CUpti_EventGroupSets *passData;
 
 
 
     //metrics Start ----------------------------------------
-    CUPTI_CALL(Subscribe(&subscriber, (CUpti_CallbackFunc)getMetricValueCallback, &metricData));
-    CUPTI_CALL(EnableCallback(1, subscriber, CUPTI_CB_DOMAIN_RUNTIME_API,
+    CUPTI_CALL(Subscribe(&subscriber_, (CUpti_CallbackFunc)getMetricValueCallback, &metricData));
+    CUPTI_CALL(EnableCallback(1, subscriber_, CUPTI_CB_DOMAIN_RUNTIME_API,
                                    CUPTI_RUNTIME_TRACE_CBID_cudaLaunch_v3020));
-   CUPTI_CALL(EnableDomain(1, subscriber, CUPTI_CB_DOMAIN_RUNTIME_API));
+   // CUPTI_CALL(EnableDomain(1, subscriber, CUPTI_CB_DOMAIN_RUNTIME_API));
 
     // allocate space to hold all the events needed for the metric
     CUPTI_CALL(MetricGetIdFromName(CUDAdevice, metricName, &metricId));
@@ -596,6 +605,7 @@ Status DeviceTracerImpl::Start() {
     // needed for the metric and the event groups for each pass
     CUPTI_CALL(MetricCreateEventGroupSets(CUDAcontext, sizeof(metricId), &metricId, &passData));
     metricData.eventGroups = passData->sets;
+    std::cout << "@@@@@@@  " << passData->numSets << std::endl;
 
     // metrics end ------------------------------------
 
@@ -629,34 +639,34 @@ Status DeviceTracerImpl::Start() {
 
   // Intercept launch and memcpy calls to capture the Op name annotation.
   // TODO(pbar) Add callbacks for memcpy variants.
-  CUPTI_CALL(EnableCallback(/*enable=*/1, subscriber_,
-                            CUPTI_CB_DOMAIN_DRIVER_API,
-                            CUPTI_DRIVER_TRACE_CBID_cuLaunchKernel));
-  CUPTI_CALL(EnableCallback(/*enable=*/1, subscriber_,
-                            CUPTI_CB_DOMAIN_RUNTIME_API,
-                            CUPTI_RUNTIME_TRACE_CBID_cudaMemcpy_v3020));
-  CUPTI_CALL(EnableCallback(
-      /*enable=*/1, subscriber_, CUPTI_CB_DOMAIN_RUNTIME_API,
-      CUPTI_RUNTIME_TRACE_CBID_cudaMemcpyAsync_v3020));
-
-  CUPTI_CALL(EnableCallback(/*enable=*/1, subscriber_,
-                            CUPTI_CB_DOMAIN_DRIVER_API,
-                            CUPTI_DRIVER_TRACE_CBID_cuMemcpyDtoH_v2));
-  CUPTI_CALL(EnableCallback(/*enable=*/1, subscriber_,
-                            CUPTI_CB_DOMAIN_DRIVER_API,
-                            CUPTI_DRIVER_TRACE_CBID_cuMemcpyDtoHAsync_v2));
-  CUPTI_CALL(EnableCallback(/*enable=*/1, subscriber_,
-                            CUPTI_CB_DOMAIN_DRIVER_API,
-                            CUPTI_DRIVER_TRACE_CBID_cuMemcpyHtoD_v2));
-  CUPTI_CALL(EnableCallback(/*enable=*/1, subscriber_,
-                            CUPTI_CB_DOMAIN_DRIVER_API,
-                            CUPTI_DRIVER_TRACE_CBID_cuMemcpyHtoDAsync_v2));
-  CUPTI_CALL(EnableCallback(/*enable=*/1, subscriber_,
-                            CUPTI_CB_DOMAIN_DRIVER_API,
-                            CUPTI_DRIVER_TRACE_CBID_cuMemcpyDtoD_v2));
-  CUPTI_CALL(EnableCallback(/*enable=*/1, subscriber_,
-                            CUPTI_CB_DOMAIN_DRIVER_API,
-                            CUPTI_DRIVER_TRACE_CBID_cuMemcpyDtoDAsync_v2));
+  // CUPTI_CALL(EnableCallback(/*enable=*/1, subscriber_,
+  //                           CUPTI_CB_DOMAIN_DRIVER_API,
+  //                           CUPTI_DRIVER_TRACE_CBID_cuLaunchKernel));
+  // CUPTI_CALL(EnableCallback(/*enable=*/1, subscriber_,
+  //                           CUPTI_CB_DOMAIN_RUNTIME_API,
+  //                           CUPTI_RUNTIME_TRACE_CBID_cudaMemcpy_v3020));
+  // CUPTI_CALL(EnableCallback(
+  //     /*enable=*/1, subscriber_, CUPTI_CB_DOMAIN_RUNTIME_API,
+  //     CUPTI_RUNTIME_TRACE_CBID_cudaMemcpyAsync_v3020));
+  //
+  // CUPTI_CALL(EnableCallback(/*enable=*/1, subscriber_,
+  //                           CUPTI_CB_DOMAIN_DRIVER_API,
+  //                           CUPTI_DRIVER_TRACE_CBID_cuMemcpyDtoH_v2));
+  // CUPTI_CALL(EnableCallback(/*enable=*/1, subscriber_,
+  //                           CUPTI_CB_DOMAIN_DRIVER_API,
+  //                           CUPTI_DRIVER_TRACE_CBID_cuMemcpyDtoHAsync_v2));
+  // CUPTI_CALL(EnableCallback(/*enable=*/1, subscriber_,
+  //                           CUPTI_CB_DOMAIN_DRIVER_API,
+  //                           CUPTI_DRIVER_TRACE_CBID_cuMemcpyHtoD_v2));
+  // CUPTI_CALL(EnableCallback(/*enable=*/1, subscriber_,
+  //                           CUPTI_CB_DOMAIN_DRIVER_API,
+  //                           CUPTI_DRIVER_TRACE_CBID_cuMemcpyHtoDAsync_v2));
+  // CUPTI_CALL(EnableCallback(/*enable=*/1, subscriber_,
+  //                           CUPTI_CB_DOMAIN_DRIVER_API,
+  //                           CUPTI_DRIVER_TRACE_CBID_cuMemcpyDtoD_v2));
+  // CUPTI_CALL(EnableCallback(/*enable=*/1, subscriber_,
+  //                           CUPTI_CB_DOMAIN_DRIVER_API,
+  //                           CUPTI_DRIVER_TRACE_CBID_cuMemcpyDtoDAsync_v2));
 
   TF_RETURN_IF_ERROR(cupti_manager_->EnableTrace(this));
 
@@ -672,7 +682,6 @@ Status DeviceTracerImpl::Start() {
 
 Status DeviceTracerImpl::Stop() {
 
-
   //metrics start -----------------------------------
   unsigned int pass;
   CUpti_MetricValue metricValue;
@@ -685,7 +694,8 @@ Status DeviceTracerImpl::Stop() {
                                 0, &metricValue));
                                 //TODO kernelDuration instead of 0 normally
 
- const char* metricName = "ipc";
+                                /*
+ const char* metricName = "dram_read_throughput";
  // print metric value, we format based on the value kind
  {
    CUpti_MetricValueKind valueKind;
@@ -721,7 +731,7 @@ Status DeviceTracerImpl::Stop() {
    }
  }
  return Status::OK();
-
+*/
       //metrics end --------------------------------------
   VLOG(1) << "DeviceTracer::Stop";
 
@@ -729,11 +739,14 @@ Status DeviceTracerImpl::Stop() {
   if (!enabled_) {
     return Status::OK();
   }
+  std::cout << "000000000000" << std::endl;
   CUPTI_CALL(Unsubscribe(subscriber_));
   port::Tracing::RegisterEngine(nullptr);
+  std::cout << "1111111111111" << std::endl;
   TF_RETURN_IF_ERROR(cupti_manager_->DisableTrace());
   end_walltime_us_ = NowInUsec();
   CUPTI_CALL(GetTimestamp(&end_timestamp_));
+  std::cout << "2222222222222" << std::endl;
   enabled_ = false;
   return Status::OK();
 }
@@ -858,11 +871,12 @@ void DeviceTracerImpl::ActivityCallback(const CUpti_Activity &record) {
   }
 }
 
-Status DeviceTracerImpl::Collect(StepStatsCollector *collector) {
+Status DeviceTracerImpl::Collect(StepStatsCollector *collector) {  return Status::OK();
+
   mutex_lock l(mu_);
-  // if (enabled_) {
-  //   return errors::FailedPrecondition("DeviceTracer is still enabled.");
-  // }
+  if (enabled_) {
+    return errors::FailedPrecondition("DeviceTracer is still enabled.");
+  }
 
   // TODO(pbar) Handle device IDs and prefix properly.
   const string prefix = "";
