@@ -435,19 +435,7 @@ void CUPTIAPI
 getMetricValueCallback(void *userdata, CUpti_CallbackDomain domain,
                        CUpti_CallbackId cbid, const CUpti_CallbackData *cbInfo)
 {
-    std::cout << "CALLback ###" << std::endl;
-    if(domain == CUPTI_CB_DOMAIN_DRIVER_API) {
-        uint64_t tp;
-        if (cbInfo->callbackSite == CUPTI_API_ENTER) {
-            // GetTimestamp(&tp);
-            struct timeval time;
-            gettimeofday(&time, NULL); // Start Time
-            long totalTime = ((time.tv_sec * 1000) + (time.tv_usec / 1000));
-            printf("%d: %s\n", totalTime, cbInfo->functionName);
-        }
-        printf("++++++++++\n"   );
-        return;
-    }
+
 
 
     // return;
@@ -582,7 +570,7 @@ Status DeviceTracerImpl::Start() {
     std::cout << "cuda device : " << (res==CUDA_SUCCESS) << std::endl;
 
     //variables ----------------------------------------------
-    const char *metricName = "dram_read_throughput";
+    const char *metricName = "ipc";
     CUpti_EventGroupSets *passData;
 
 
@@ -596,6 +584,7 @@ Status DeviceTracerImpl::Start() {
     // allocate space to hold all the events needed for the metric
     CUPTI_CALL(MetricGetIdFromName(CUDAdevice, metricName, &metricId));
     CUPTI_CALL(MetricGetNumEvents(metricId, &metricData.numEvents));
+    std::cout << "@@@ nuevents : " << metricData.numEvents << std::endl;
     metricData.device = CUDAdevice;
     metricData.eventIdArray = (CUpti_EventID *)malloc(metricData.numEvents * sizeof(CUpti_EventID));
     metricData.eventValueArray = (uint64_t *)malloc(metricData.numEvents * sizeof(uint64_t));
@@ -695,7 +684,7 @@ Status DeviceTracerImpl::Stop() {
                                 //TODO kernelDuration instead of 0 normally
 
                                 /*
- const char* metricName = "dram_read_throughput";
+ const char* metricName = "ipc";
  // print metric value, we format based on the value kind
  {
    CUpti_MetricValueKind valueKind;
@@ -828,7 +817,7 @@ void DeviceTracerImpl::ActivityCallback(const CUpti_Activity &record) {
       ss << api->cbid;
       tracepoint(cuptiTracer, driver_api_entry, ss.str().c_str(), api->start);
       tracepoint(cuptiTracer, driver_api_exit, ss.str().c_str(), api->end);
-      printf("DRIVER cbid=%u process %u, thread %u, correlation %u\n", api->cbid, api->processId, api->threadId, api->correlationId);
+    //   printf("DRIVER cbid=%u process %u, thread %u, correlation %u\n", api->cbid, api->processId, api->threadId, api->correlationId);
       break;}
     case CUPTI_ACTIVITY_KIND_RUNTIME:{
       CUpti_ActivityAPI *api = (CUpti_ActivityAPI *) &record;
@@ -836,7 +825,7 @@ void DeviceTracerImpl::ActivityCallback(const CUpti_Activity &record) {
       ss << api->cbid;
       tracepoint(cuptiTracer, runtime_api_entry, ss.str().c_str(), api->start);
       tracepoint(cuptiTracer, runtime_api_exit, ss.str().c_str(), api->end);
-      printf("RUNTIME cbid=%u process %u, thread %u, correlation %u\n", api->cbid, api->processId, api->threadId, api->correlationId);
+    //   printf("RUNTIME cbid=%u process %u, thread %u, correlation %u\n", api->cbid, api->processId, api->threadId, api->correlationId);
       break;}
     case CUPTI_ACTIVITY_KIND_MEMCPY: {
       if (memcpy_records_.size() >= kMaxRecords) return;
@@ -871,7 +860,7 @@ void DeviceTracerImpl::ActivityCallback(const CUpti_Activity &record) {
   }
 }
 
-Status DeviceTracerImpl::Collect(StepStatsCollector *collector) {  return Status::OK();
+Status DeviceTracerImpl::Collect(StepStatsCollector *collector) {
 
   mutex_lock l(mu_);
   if (enabled_) {
