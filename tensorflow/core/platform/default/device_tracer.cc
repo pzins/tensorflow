@@ -683,7 +683,6 @@ Status DeviceTracerImpl::Stop() {
                                 0, &metricValue));
                                 //TODO kernelDuration instead of 0 normally
 
-                                /*
  const char* metricName = "ipc";
  // print metric value, we format based on the value kind
  {
@@ -719,8 +718,8 @@ Status DeviceTracerImpl::Stop() {
      exit(-1);
    }
  }
- return Status::OK();
-*/
+ // return Status::OK();
+
       //metrics end --------------------------------------
   VLOG(1) << "DeviceTracer::Stop";
 
