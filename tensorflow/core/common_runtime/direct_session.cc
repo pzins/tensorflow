@@ -440,7 +440,7 @@ Status DirectSession::Run(const RunOptions& run_options,
                           std::vector<Tensor>* outputs,
                           RunMetadata* run_metadata) {
   int count = direct_session_runs->GetCell()->value();
-  tracepoint(tensorflowTracer, session_start, "DirectSession::Run", count);
+  tracepoint(tensorflowTracer, session_start, "session", "DirectSession::Run", count);
   TF_RETURN_IF_ERROR(CheckNotClosed());
   direct_session_runs->GetCell()->IncrementBy(1);
   {
@@ -707,7 +707,7 @@ Status DirectSession::Run(const RunOptions& run_options,
       exec_and_lib.graph->ToGraphDef(partition_graph_def);
     }
   }
-  tracepoint(tensorflowTracer, session_end, "DirectSession::Run", count);
+  tracepoint(tensorflowTracer, session_end, "session", "DirectSession::Run", count);
   return Status::OK();
 }
 
