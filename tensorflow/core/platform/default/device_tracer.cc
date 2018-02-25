@@ -335,11 +335,10 @@ typedef struct RuntimeApiTrace_st {
 
 
 static void
-displayEventVal(RuntimeApiTrace_t *trace, const char *eventName)
+displayEventVal(RuntimeApiTrace_t *trace, std::vector<string>& v)
 {
     for(int i = 0; i < trace->nb_element; ++i) {
-        printf("Event Name : %s \n", eventName);
-        printf("Event Value : %llu\n", (unsigned long long) trace->eventVal[i]);
+        printf("Event Name : %s \n", v.at(i));
         printf("Event Value : %llu\n", (unsigned long long) trace->eventVal[i]);
     }
 }
@@ -451,6 +450,7 @@ class DeviceTracerImpl : public DeviceTracer,
     CUpti_SubscriberHandle subscriber;
     cupti_eventData cuptiEvent;
     RuntimeApiTrace_t trace;
+    std::vector<string> events_str;
 
 
 };
@@ -617,15 +617,13 @@ Status DeviceTracerImpl::Start() {
      std::string s(env_p);
      std::string delimiter = " ";
      std::string token = s.substr(0, s.find(delimiter)); // token is "scott"
-     std::vector<string> key_parts = str_util::Split(s, ' ');
-    //  for(auto i : key_parts) {
-    //      std::cout << "##" << i << std::endl;
-    //  }
-     trace.nb_element = key_parts.size();
-     trace.eventVal = new uint64_t[key_parts.size()];
+     events_str = str_util::Split(s, ' ');
+
+     trace.nb_element = events_str.size();
+     trace.eventVal = new uint64_t[events_str.size()];
      trace.eventData = &cuptiEvent;
 
-     trace.eventData->eventId = new CUpti_EventID[key_parts.size()];
+     trace.eventData->eventId = new CUpti_EventID[events_str.size()];
 
     CUresult res = cuCtxGetCurrent(&CUDAcontext);
     std::cout << "cuda context : " << (res==CUDA_SUCCESS) << std::endl;
@@ -633,8 +631,8 @@ Status DeviceTracerImpl::Start() {
     std::cout << "cuda device : " << (res==CUDA_SUCCESS) << std::endl;
 
     cuptiErr = cupti_wrapper_->EventGroupCreate(CUDAcontext, &cuptiEvent.eventGroup, 0);
-    for(int i = 0; i < key_parts.size(); ++i) {
-        cuptiErr = cupti_wrapper_->EventGetIdFromName(CUDAdevice, key_parts.at(i).c_str(), &cuptiEvent.eventId[i]);
+    for(int i = 0; i < events_str.size(); ++i) {
+        cuptiErr = cupti_wrapper_->EventGetIdFromName(CUDAdevice, events_str.at(i).c_str(), &cuptiEvent.eventId[i]);
         cuptiErr = cupti_wrapper_->EventGroupAddEvent(cuptiEvent.eventGroup, cuptiEvent.eventId[i]);
     }
     trace.eventData = &cuptiEvent;
@@ -716,7 +714,7 @@ Status DeviceTracerImpl::Start() {
 
 Status DeviceTracerImpl::Stop() {
 
-    displayEventVal(&trace, "eventName");
+    displayEventVal(&trace, events_str);
 
 
       //metrics end --------------------------------------
