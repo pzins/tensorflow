@@ -80,7 +80,16 @@ LIBCUPTI_WRAP(cuptiEventGetAttribute);
 LIBCUPTI_WRAP(cuptiEventGroupDisable);
 LIBCUPTI_WRAP(cuptiActivityEnableLatencyTimestamps);
 
+LIBCUPTI_WRAP(cuptiEventGroupAddEvent);
+LIBCUPTI_WRAP(cuptiEventGetIdFromName);
+LIBCUPTI_WRAP(cuptiEventGroupCreate);
+LIBCUPTI_WRAP(cuptiEventGroupReadAllEvents);
+
 } //namespace dynload
+
+CUptiResult CuptiWrapper::EventGroupReadAllEvents(CUpti_EventGroup eventGroup, CUpti_ReadEventFlags flags, size_t* eventValueBufferSizeBytes, uint64_t* eventValueBuffer, size_t* eventIdArraySizeBytes, CUpti_EventID* eventIdArray, size_t* numEventIdsRead) {
+    return dynload::cuptiEventGroupReadAllEvents(eventGroup, flags, eventValueBufferSizeBytes, eventValueBuffer, eventIdArraySizeBytes, eventIdArray, numEventIdsRead);
+}
 
 CUptiResult CuptiWrapper::ActivityEnableLatencyTimestamps(uint8_t enable) {
     return dynload::cuptiActivityEnableLatencyTimestamps(enable);
@@ -204,6 +213,23 @@ CUptiResult CuptiWrapper::EventGroupDisable(CUpti_EventGroup eventGroup) {
 CUptiResult CuptiWrapper::EventGetAttribute(CUpti_EventID event, CUpti_EventAttribute attrib, size_t* valueSize, void* value) {
     return dynload::cuptiEventGetAttribute(event, attrib, valueSize, value);
 }
+
+
+CUptiResult CuptiWrapper::EventGroupAddEvent(CUpti_EventGroup eventGroup, CUpti_EventID event) {
+    return dynload::cuptiEventGroupAddEvent(eventGroup, event);
+}
+
+CUptiResult CuptiWrapper::EventGetIdFromName(CUdevice device, const char* eventName, CUpti_EventID* event) {
+    return dynload::cuptiEventGetIdFromName(device, eventName, event);
+}
+
+CUptiResult CuptiWrapper::EventGroupCreate(CUcontext context, CUpti_EventGroup* eventGroup, uint32_t flags) {
+    return dynload::cuptiEventGroupCreate(context, eventGroup, flags);
+}
+
+
+
+
 }  // namespace profiler
 }  // namespace gputools
 }  // namespace perftools
