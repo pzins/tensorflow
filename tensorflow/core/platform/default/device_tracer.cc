@@ -316,6 +316,29 @@ typedef struct MetricData_st {
   uint64_t *eventValueArray;
 } MetricData_t;
 
+typedef struct cupti_eventData_st {
+  CUpti_EventGroup eventGroup;
+  CUpti_EventID* eventId;
+} cupti_eventData;
+
+// Structure to hold data collected by callback
+typedef struct RuntimeApiTrace_st {
+  cupti_eventData eventData;
+  uint64_t* eventVal;
+  int nb_events;
+} RuntimeApiTrace_t;
+
+static void
+displayEventVal(RuntimeApiTrace_t *trace, std::vector<std::vector<string>>& v)
+{
+    for(int i = 0; i < v.size(); ++i) {
+        for(int j = 0; j < v.at(i).size(); ++j) {
+            std::cout << v.at(i).at(j) << " : " << (unsigned long long) trace[i].eventVal[j] << std::endl;
+        }
+    }
+}
+
+
 class DeviceTracerImpl : public DeviceTracer,
                          public CUPTIClient,
                          public port::Tracing::Engine {
@@ -421,6 +444,15 @@ class DeviceTracerImpl : public DeviceTracer,
     unsigned int pass;
     CUpti_MetricValue *metricValue;
 
+
+    CUptiResult cuptiErr;
+    CUpti_SubscriberHandle subscriber;
+    cupti_eventData cuptiEvent;
+    RuntimeApiTrace_t* trace;
+    std::vector<std::vector<string>> events_str;
+    int nb_domains;
+    unsigned int cupti_mode;
+
 };
 
 DeviceTracerImpl::DeviceTracerImpl() {
@@ -429,6 +461,7 @@ DeviceTracerImpl::DeviceTracerImpl() {
   CHECK(cupti_manager_);
   cupti_wrapper_.reset(new perftools::gputools::profiler::CuptiWrapper());
   enabled_ = false;
+  cupti_mode = 0;
 }
 
 DeviceTracerImpl::~DeviceTracerImpl() {
@@ -439,50 +472,98 @@ DeviceTracerImpl::~DeviceTracerImpl() {
 
 
 Status DeviceTracerImpl::Start() {
-    std::cout << "start entry" << std::endl;
     CUresult res = cuCtxGetCurrent(&CUDAcontext);
     res = cuDeviceGet(&CUDAdevice, 0);
-
-
     const char* env_p;
-    if(!(env_p = std::getenv("CUPTI_METRICS"))) {
+    if(!(env_p = std::getenv("CUPTI"))) {
         env_p = "";
     }
-     std::string s(env_p);
-     metricName = str_util::Split(s, ' ');
-     nb_metrics = metricName.size();
+    if(string(env_p) == "metrics") {
+        cupti_mode = 1;
+        if(!(env_p = std::getenv("CUPTI_METRICS"))) {
+            env_p = "";
+        }
+         std::string s(env_p);
+         metricName = str_util::Split(s, ' ');
+         nb_metrics = metricName.size();
 
-    CUptiResult ret;
-    ret = cupti_wrapper_->Subscribe(
-        &subscriber_, static_cast<CUpti_CallbackFunc>(ApiCallback), this);
-    if (ret == CUPTI_ERROR_MAX_LIMIT_REACHED) {
-        return errors::Unavailable("CUPTI subcriber limit reached.");
-    } else if (ret != CUPTI_SUCCESS) {
-        return errors::Internal("Failed to create CUPTI subcriber.");
-    }
+        CUptiResult ret;
+        ret = cupti_wrapper_->Subscribe(
+            &subscriber_, static_cast<CUpti_CallbackFunc>(ApiCallback), this);
+        if (ret == CUPTI_ERROR_MAX_LIMIT_REACHED) {
+            return errors::Unavailable("CUPTI subcriber limit reached.");
+        } else if (ret != CUPTI_SUCCESS) {
+            return errors::Internal("Failed to create CUPTI subcriber.");
+        }
 
-    cupti_wrapper_->EnableCallback(1, subscriber_, CUPTI_CB_DOMAIN_RUNTIME_API,
-                                   CUPTI_RUNTIME_TRACE_CBID_cudaLaunch_v3020);
+        cupti_wrapper_->EnableCallback(1, subscriber_, CUPTI_CB_DOMAIN_RUNTIME_API,
+                                       CUPTI_RUNTIME_TRACE_CBID_cudaLaunch_v3020);
 
 
 
-     metricId = new CUpti_MetricID[nb_metrics];
-     metricData = new MetricData_t[nb_metrics];
-     metricValue = new CUpti_MetricValue[nb_metrics];
-     CUpti_EventGroupSets *passData[nb_metrics];
+         metricId = new CUpti_MetricID[nb_metrics];
+         metricData = new MetricData_t[nb_metrics];
+         metricValue = new CUpti_MetricValue[nb_metrics];
+         CUpti_EventGroupSets *passData[nb_metrics];
 
-     for(int i = 0; i < nb_metrics; ++i) {
-         // allocate space to hold all the events needed for the metric
-         CUPTI_CALL(MetricGetIdFromName(CUDAdevice, metricName.at(i).c_str(), &metricId[i]));
-         CUPTI_CALL(MetricGetNumEvents(metricId[i], &metricData[i].numEvents));
-         metricData[i].device = CUDAdevice;
-         metricData[i].eventIdArray = (CUpti_EventID *)malloc(metricData[i].numEvents * sizeof(CUpti_EventID));
-         metricData[i].eventValueArray = (uint64_t *)malloc(metricData[i].numEvents * sizeof(uint64_t));
-         metricData[i].eventIdx = 0;
-         // get the number of passes required to collect all the events
-         // needed for the metric and the event groups for each pass
-         CUPTI_CALL(MetricCreateEventGroupSets(CUDAcontext, sizeof(metricId[i]), &metricId[i], &passData[i]));
-         metricData[i].eventGroups = passData[i]->sets ;
+         for(int i = 0; i < nb_metrics; ++i) {
+             // allocate space to hold all the events needed for the metric
+             CUPTI_CALL(MetricGetIdFromName(CUDAdevice, metricName.at(i).c_str(), &metricId[i]));
+             CUPTI_CALL(MetricGetNumEvents(metricId[i], &metricData[i].numEvents));
+             metricData[i].device = CUDAdevice;
+             metricData[i].eventIdArray = (CUpti_EventID *)malloc(metricData[i].numEvents * sizeof(CUpti_EventID));
+             metricData[i].eventValueArray = (uint64_t *)malloc(metricData[i].numEvents * sizeof(uint64_t));
+             metricData[i].eventIdx = 0;
+             // get the number of passes required to collect all the events
+             // needed for the metric and the event groups for each pass
+             CUPTI_CALL(MetricCreateEventGroupSets(CUDAcontext, sizeof(metricId[i]), &metricId[i], &passData[i]));
+             metricData[i].eventGroups = passData[i]->sets ;
+         }
+     } else if(string(env_p) == "events")  {
+         cupti_mode = 2;
+         if(!(env_p = std::getenv("CUPTI_EVENTS"))) {
+             env_p = "";
+         }
+          std::string s(env_p);
+          std::vector<string> tmp = str_util::Split(s, ';');
+          nb_domains = tmp.size();
+
+          trace = new RuntimeApiTrace_t[nb_domains];
+          for(int i = 0; i < nb_domains; ++i) {
+              events_str.push_back(str_util::Split(tmp.at(i), ' '));
+              trace[i].nb_events = events_str.at(events_str.size() - 1).size();
+          }
+
+          CUresult res = cuCtxGetCurrent(&CUDAcontext);
+          res = cuDeviceGet(&CUDAdevice, 0);
+
+
+          for(int i = 0; i < nb_domains; ++i) {
+
+              trace[i].eventVal = new uint64_t[trace[i].nb_events];
+              // just set a inital random value to find easily errors
+              for(int o = 0; o < trace[i].nb_events; ++o) trace[i].eventVal[o] = 18;
+              trace[i].eventData.eventId = new CUpti_EventID[trace[i].nb_events];
+             cuptiErr = cupti_wrapper_->EventGroupCreate(CUDAcontext, &trace[i].eventData.eventGroup, 0);
+             for(int j = 0; j < trace[i].nb_events; ++j) {
+                 cuptiErr = cupti_wrapper_->EventGetIdFromName(CUDAdevice, events_str.at(i).at(j).c_str(), &trace[i].eventData.eventId[i]);
+                 cuptiErr = cupti_wrapper_->EventGroupAddEvent(trace[i].eventData.eventGroup, trace[i].eventData.eventId[i]);
+             }
+         }
+
+         CUptiResult ret;
+         ret = cupti_wrapper_->Subscribe(
+             &subscriber_, static_cast<CUpti_CallbackFunc>(ApiCallback), this);
+             if (ret == CUPTI_ERROR_MAX_LIMIT_REACHED) {
+                 return errors::Unavailable("CUPTI subcriber limit reached.");
+             } else if (ret != CUPTI_SUCCESS) {
+                 return errors::Internal("Failed to create CUPTI subcriber.");
+             }
+
+         cuptiErr = cupti_wrapper_->EnableCallback(1, subscriber_, CUPTI_CB_DOMAIN_RUNTIME_API,
+                                        CUPTI_RUNTIME_TRACE_CBID_cudaLaunch_v3020);
+
+
      }
 
     VLOG(1) << "GPUTracer::Start";
@@ -548,7 +629,6 @@ Status DeviceTracerImpl::Start() {
   CUPTI_CALL(GetTimestamp(&start_timestamp_));
   start_walltime_us_ = NowInUsec();
   enabled_ = true;
-  std::cout << "start exit" << std::endl;
   return Status::OK();
 }
 
@@ -557,55 +637,58 @@ Status DeviceTracerImpl::Start() {
 
 
 Status DeviceTracerImpl::Stop() {
-std::cout << "STOP" << std::endl;
-  //metrics start -----------------------------------
-  unsigned int pass;
-  for(int i = 0; i < nb_metrics; ++i) {
-      std::cout << "-----------------" << std::endl;
-  // use all the collected events to calculate the metric value
- CUPTI_CALL(MetricGetValue(CUDAdevice, metricId[i],
-                                metricData[i].numEvents * sizeof(CUpti_EventID),
-                                metricData[i].eventIdArray,
-                                metricData[i].numEvents * sizeof(uint64_t),
-                                metricData[i].eventValueArray,
-                                0, &metricValue[i]));
-                                //TODO kernelDuration instead of 0 normally
+    if(cupti_mode == 1) {
+      unsigned int pass;
+      for(int i = 0; i < nb_metrics; ++i) {
 
- // const char* metricName = "ipc";
- // print metric value, we format based on the value kind
- {
-   CUpti_MetricValueKind valueKind;
-   size_t valueKindSize = sizeof(valueKind);
-   CUPTI_CALL(MetricGetAttribute(metricId[i], CUPTI_METRIC_ATTR_VALUE_KIND,
-                                      &valueKindSize, &valueKind));
-   switch (valueKind) {
-   case CUPTI_METRIC_VALUE_KIND_DOUBLE:
-     printf("Metric %s = %f\n", metricName[i].c_str(), metricValue[i].metricValueDouble);
-     break;
-   case CUPTI_METRIC_VALUE_KIND_UINT64:
-     printf("Metric %s = %llu\n", metricName[i].c_str(),
-            (unsigned long long)metricValue[i].metricValueUint64);
-     break;
-   case CUPTI_METRIC_VALUE_KIND_INT64:
-     printf("Metric %s = %lld\n", metricName[i].c_str(),
-            (long long)metricValue[i].metricValueInt64);
-     break;
-   case CUPTI_METRIC_VALUE_KIND_PERCENT:
-     printf("Metric %s = %f%%\n", metricName[i].c_str(), metricValue[i].metricValuePercent);
-     break;
-   case CUPTI_METRIC_VALUE_KIND_THROUGHPUT:
-     printf("Metric %s = %llu bytes/sec\n", metricName[i].c_str(),
-            (unsigned long long)metricValue[i].metricValueThroughput);
-     break;
-   case CUPTI_METRIC_VALUE_KIND_UTILIZATION_LEVEL:
-     printf("Metric %s = utilization level %u\n", metricName[i].c_str(),
-            (unsigned int)metricValue[i].metricValueUtilizationLevel);
-     break;
-   default:
-     fprintf(stderr, "error: unknown value kind\n");
-     exit(-1);
-   }
- }
+      // use all the collected events to calculate the metric value
+     CUPTI_CALL(MetricGetValue(CUDAdevice, metricId[i],
+                                    metricData[i].numEvents * sizeof(CUpti_EventID),
+                                    metricData[i].eventIdArray,
+                                    metricData[i].numEvents * sizeof(uint64_t),
+                                    metricData[i].eventValueArray,
+                                    0, &metricValue[i]));
+                                    //TODO kernelDuration instead of 0 normally
+
+     // const char* metricName = "ipc";
+     // print metric value, we format based on the value kind
+     {
+       CUpti_MetricValueKind valueKind;
+       size_t valueKindSize = sizeof(valueKind);
+       CUPTI_CALL(MetricGetAttribute(metricId[i], CUPTI_METRIC_ATTR_VALUE_KIND,
+                                          &valueKindSize, &valueKind));
+       switch (valueKind) {
+       case CUPTI_METRIC_VALUE_KIND_DOUBLE:
+         printf("Metric %s = %f\n", metricName[i].c_str(), metricValue[i].metricValueDouble);
+         break;
+       case CUPTI_METRIC_VALUE_KIND_UINT64:
+         printf("Metric %s = %llu\n", metricName[i].c_str(),
+                (unsigned long long)metricValue[i].metricValueUint64);
+         break;
+       case CUPTI_METRIC_VALUE_KIND_INT64:
+         printf("Metric %s = %lld\n", metricName[i].c_str(),
+                (long long)metricValue[i].metricValueInt64);
+         break;
+       case CUPTI_METRIC_VALUE_KIND_PERCENT:
+         printf("Metric %s = %f%%\n", metricName[i].c_str(), metricValue[i].metricValuePercent);
+         break;
+       case CUPTI_METRIC_VALUE_KIND_THROUGHPUT:
+         printf("Metric %s = %llu bytes/sec\n", metricName[i].c_str(),
+                (unsigned long long)metricValue[i].metricValueThroughput);
+         break;
+       case CUPTI_METRIC_VALUE_KIND_UTILIZATION_LEVEL:
+         printf("Metric %s = utilization level %u\n", metricName[i].c_str(),
+                (unsigned int)metricValue[i].metricValueUtilizationLevel);
+         break;
+       default:
+         fprintf(stderr, "error: unknown value kind\n");
+         exit(-1);
+       }
+     }
+     }
+ } else if (cupti_mode == 2){
+     displayEventVal(trace, events_str);
+
  }
  // return Status::OK();
 
@@ -638,7 +721,6 @@ void DeviceTracerImpl::AddCorrelationId(uint32 correlation_id,
                                               CUpti_CallbackId cbid,
                                               const void *cbdata) {
   auto *cbInfo = reinterpret_cast<const CUpti_CallbackData *>(cbdata);
-  std::cout << "ApiCallback entry" << std::endl;
   DeviceTracerImpl *tracer = reinterpret_cast<DeviceTracerImpl *>(userdata);
   VLOG(2) << "ApiCallback " << domain << ":" << cbid
           << " func: " << cbInfo->functionName;
@@ -652,125 +734,159 @@ void DeviceTracerImpl::AddCorrelationId(uint32 correlation_id,
   // }
 
 
-  // on entry, enable all the event groups being collected this pass,
-  // for metrics we collect for all instances of the event
-  if (cbInfo->callbackSite == CUPTI_API_ENTER) {
-      cudaDeviceSynchronize();
-      CUptiResult res;
-      res = tracer->cupti_wrapper_->SetEventCollectionMode(cbInfo->context, CUPTI_EVENT_COLLECTION_MODE_KERNEL);
-      if(res != CUPTI_SUCCESS) std::cout << "SetEventCollectionMode failed" << std::endl;
-      for(int j = 0; j < tracer->nb_metrics; ++j) {
-          for (int i = 0; i < tracer->metricData[j].eventGroups->numEventGroups; i++) {
-              uint32_t all = 1;
-              res = tracer->cupti_wrapper_->EventGroupSetAttribute(tracer->metricData[j].eventGroups->eventGroups[i],
-                                                                    CUPTI_EVENT_GROUP_ATTR_PROFILE_ALL_DOMAIN_INSTANCES,
-                                                                    sizeof(all), &all);
-              if(res != CUPTI_SUCCESS) std::cout << "EventGroupSetAttribute failed" << std::endl;
-              res = tracer->cupti_wrapper_->EventGroupEnable(tracer->metricData[j].eventGroups->eventGroups[i]);
+  if(tracer->cupti_mode == 1) {
+      // on entry, enable all the event groups being collected this pass,
+      // for metrics we collect for all instances of the event
+      if (cbInfo->callbackSite == CUPTI_API_ENTER) {
+          cudaDeviceSynchronize();
+          CUptiResult res;
+          res = tracer->cupti_wrapper_->SetEventCollectionMode(cbInfo->context, CUPTI_EVENT_COLLECTION_MODE_KERNEL);
+          if(res != CUPTI_SUCCESS) std::cout << "SetEventCollectionMode failed" << std::endl;
+          for(int j = 0; j < tracer->nb_metrics; ++j) {
+              for (int i = 0; i < tracer->metricData[j].eventGroups->numEventGroups; i++) {
+                  uint32_t all = 1;
+                  res = tracer->cupti_wrapper_->EventGroupSetAttribute(tracer->metricData[j].eventGroups->eventGroups[i],
+                                                                        CUPTI_EVENT_GROUP_ATTR_PROFILE_ALL_DOMAIN_INSTANCES,
+                                                                        sizeof(all), &all);
+                  if(res != CUPTI_SUCCESS) std::cout << "EventGroupSetAttribute failed" << std::endl;
+                  res = tracer->cupti_wrapper_->EventGroupEnable(tracer->metricData[j].eventGroups->eventGroups[i]);
+              }
           }
       }
-  }
 
 
-  // on exit, read and record event values
-  if (cbInfo->callbackSite == CUPTI_API_EXIT) {
-      cudaDeviceSynchronize();
-      // for each group, read the event values from the group and record
-      // in tracer->metricData
-      for(int idx = 0; idx < tracer->nb_metrics; ++idx) {
-          for (int i = 0; i < tracer->metricData[idx].eventGroups->numEventGroups; i++) {
-            CUpti_EventGroup group = tracer->metricData[idx].eventGroups->eventGroups[i];
-            CUpti_EventDomainID groupDomain;
-            uint32_t numEvents, numInstances, numTotalInstances;
-            CUpti_EventID *eventIds;
-            size_t groupDomainSize = sizeof(groupDomain);
-            size_t numEventsSize = sizeof(numEvents);
-            size_t numInstancesSize = sizeof(numInstances);
-            size_t numTotalInstancesSize = sizeof(numTotalInstances);
-            uint64_t *values, normalized, sum;
-            size_t valuesSize, eventIdsSize;
-            CUptiResult res;
-            res = tracer->cupti_wrapper_->EventGroupGetAttribute(group,
-                                      CUPTI_EVENT_GROUP_ATTR_EVENT_DOMAIN_ID,
-                                      &groupDomainSize, &groupDomain);
-            if(res != CUPTI_SUCCESS) std::cout << "EventGroupGetAttribute failed" << std::endl;
-            res = tracer->cupti_wrapper_->DeviceGetEventDomainAttribute(tracer->metricData[idx].device, groupDomain,
-                                                          CUPTI_EVENT_DOMAIN_ATTR_TOTAL_INSTANCE_COUNT,
-                                                          &numTotalInstancesSize, &numTotalInstances);
-            if(res != CUPTI_SUCCESS) std::cout << "DeviceGetEventDomainAttribute failed" << std::endl;
-            res = tracer->cupti_wrapper_->EventGroupGetAttribute(group,
-                                       CUPTI_EVENT_GROUP_ATTR_INSTANCE_COUNT,
-                                       &numInstancesSize, &numInstances);
-            if(res != CUPTI_SUCCESS) std::cout << "EventGroupGetAttribute2 failed" << std::endl;
-            res = tracer->cupti_wrapper_->EventGroupGetAttribute(group,
-                                      CUPTI_EVENT_GROUP_ATTR_NUM_EVENTS,
-                                       &numEventsSize, &numEvents);
-            if(res != CUPTI_SUCCESS) std::cout << "EventGroupGetAttribute3 failed" << std::endl;
-            eventIdsSize = numEvents * sizeof(CUpti_EventID);
-            eventIds = (CUpti_EventID *)malloc(eventIdsSize);
-            res = tracer->cupti_wrapper_->EventGroupGetAttribute(group,
-                                       CUPTI_EVENT_GROUP_ATTR_EVENTS,
-                                       &eventIdsSize, eventIds);
-            if(res != CUPTI_SUCCESS) std::cout << "EventGroupGetAttribute4 failed" << std::endl;
+      // on exit, read and record event values
+      if (cbInfo->callbackSite == CUPTI_API_EXIT) {
+          cudaDeviceSynchronize();
+          // for each group, read the event values from the group and record
+          // in tracer->metricData
+          for(int idx = 0; idx < tracer->nb_metrics; ++idx) {
+              for (int i = 0; i < tracer->metricData[idx].eventGroups->numEventGroups; i++) {
+                CUpti_EventGroup group = tracer->metricData[idx].eventGroups->eventGroups[i];
+                CUpti_EventDomainID groupDomain;
+                uint32_t numEvents, numInstances, numTotalInstances;
+                CUpti_EventID *eventIds;
+                size_t groupDomainSize = sizeof(groupDomain);
+                size_t numEventsSize = sizeof(numEvents);
+                size_t numInstancesSize = sizeof(numInstances);
+                size_t numTotalInstancesSize = sizeof(numTotalInstances);
+                uint64_t *values, normalized, sum;
+                size_t valuesSize, eventIdsSize;
+                CUptiResult res;
+                res = tracer->cupti_wrapper_->EventGroupGetAttribute(group,
+                                          CUPTI_EVENT_GROUP_ATTR_EVENT_DOMAIN_ID,
+                                          &groupDomainSize, &groupDomain);
+                if(res != CUPTI_SUCCESS) std::cout << "EventGroupGetAttribute failed" << std::endl;
+                res = tracer->cupti_wrapper_->DeviceGetEventDomainAttribute(tracer->metricData[idx].device, groupDomain,
+                                                              CUPTI_EVENT_DOMAIN_ATTR_TOTAL_INSTANCE_COUNT,
+                                                              &numTotalInstancesSize, &numTotalInstances);
+                if(res != CUPTI_SUCCESS) std::cout << "DeviceGetEventDomainAttribute failed" << std::endl;
+                res = tracer->cupti_wrapper_->EventGroupGetAttribute(group,
+                                           CUPTI_EVENT_GROUP_ATTR_INSTANCE_COUNT,
+                                           &numInstancesSize, &numInstances);
+                if(res != CUPTI_SUCCESS) std::cout << "EventGroupGetAttribute2 failed" << std::endl;
+                res = tracer->cupti_wrapper_->EventGroupGetAttribute(group,
+                                          CUPTI_EVENT_GROUP_ATTR_NUM_EVENTS,
+                                           &numEventsSize, &numEvents);
+                if(res != CUPTI_SUCCESS) std::cout << "EventGroupGetAttribute3 failed" << std::endl;
+                eventIdsSize = numEvents * sizeof(CUpti_EventID);
+                eventIds = (CUpti_EventID *)malloc(eventIdsSize);
+                res = tracer->cupti_wrapper_->EventGroupGetAttribute(group,
+                                           CUPTI_EVENT_GROUP_ATTR_EVENTS,
+                                           &eventIdsSize, eventIds);
+                if(res != CUPTI_SUCCESS) std::cout << "EventGroupGetAttribute4 failed" << std::endl;
 
-            valuesSize = sizeof(uint64_t) * numInstances;
-            values = (uint64_t *)malloc(valuesSize);
+                valuesSize = sizeof(uint64_t) * numInstances;
+                values = (uint64_t *)malloc(valuesSize);
 
-            tracer->metricData[idx].eventIdx = 0;
-            for (int j = 0; j < numEvents; j++) {
-                res = tracer->cupti_wrapper_->EventGroupReadEvent(group, CUPTI_EVENT_READ_FLAG_NONE,
-                                                  eventIds[j], &valuesSize, values);
-                if(res != CUPTI_SUCCESS) std::cout << "EventGroupReadEvent failed" << std::endl;
+                tracer->metricData[idx].eventIdx = 0;
+                for (int j = 0; j < numEvents; j++) {
+                    res = tracer->cupti_wrapper_->EventGroupReadEvent(group, CUPTI_EVENT_READ_FLAG_NONE,
+                                                      eventIds[j], &valuesSize, values);
+                    if(res != CUPTI_SUCCESS) std::cout << "EventGroupReadEvent failed" << std::endl;
 
-                if (tracer->metricData[idx].eventIdx >= tracer->metricData[idx].numEvents) {
-                    fprintf(stderr, "error: too many events collected, metric expects only %d\n", (int)tracer->metricData[idx].numEvents);
-                    continue;
-                    exit(-1);
-                }
-
-                // sum collect event values from all instances
-                sum = 0;
-                for (int k = 0; k < numInstances; k++)
-                    sum += values[k];
-
-                // normalize the event value to represent the total number of
-                // domain instances on the device
-                normalized = (sum * numTotalInstances) / numInstances;
-
-                tracer->metricData[idx].eventIdArray[tracer->metricData[idx].eventIdx] = eventIds[j];
-                tracer->metricData[idx].eventValueArray[tracer->metricData[idx].eventIdx] = normalized;
-                tracer->metricData[idx].eventIdx++;
-
-                // print collected value
-                {
-                    char eventName[128];
-                    size_t eventNameSize = sizeof(eventName) - 1;
-                    tracer->cupti_wrapper_->EventGetAttribute(eventIds[j], CUPTI_EVENT_ATTR_NAME,
-                                                      &eventNameSize, eventName);
-                    eventName[127] = '\0';
-                    printf("\t%s = %llu (", eventName, (unsigned long long)sum);
-                    if (numInstances > 1) {
-                      for (int k = 0; k < numInstances; k++) {
-                        if (k != 0)
-                          printf(", ");
-                        printf("%llu", (unsigned long long)values[k]);
-                      }
+                    if (tracer->metricData[idx].eventIdx >= tracer->metricData[idx].numEvents) {
+                        fprintf(stderr, "error: too many events collected, metric expects only %d\n", (int)tracer->metricData[idx].numEvents);
+                        continue;
+                        exit(-1);
                     }
 
-                    printf(")\n");
-                    printf("\t%s (normalized) (%llu * %u) / %u = %llu\n",
-                           eventName, (unsigned long long)sum,
-                           numTotalInstances, numInstances,
-                           (unsigned long long)normalized);
-                }
-            }
-            free(values);
-          }
-          for (int i = 0; i < tracer->metricData[idx].eventGroups->numEventGroups; i++)
-            tracer->cupti_wrapper_->EventGroupDisable(tracer->metricData[idx].eventGroups->eventGroups[i]);
-      }
-  }
+                    // sum collect event values from all instances
+                    sum = 0;
+                    for (int k = 0; k < numInstances; k++)
+                        sum += values[k];
 
+                    // normalize the event value to represent the total number of
+                    // domain instances on the device
+                    normalized = (sum * numTotalInstances) / numInstances;
+
+                    tracer->metricData[idx].eventIdArray[tracer->metricData[idx].eventIdx] = eventIds[j];
+                    tracer->metricData[idx].eventValueArray[tracer->metricData[idx].eventIdx] = normalized;
+                    tracer->metricData[idx].eventIdx++;
+
+                    // print collected value
+                    {
+                        char eventName[128];
+                        size_t eventNameSize = sizeof(eventName) - 1;
+                        tracer->cupti_wrapper_->EventGetAttribute(eventIds[j], CUPTI_EVENT_ATTR_NAME,
+                                                          &eventNameSize, eventName);
+                        eventName[127] = '\0';
+                        printf("\t%s = %llu (", eventName, (unsigned long long)sum);
+                        if (numInstances > 1) {
+                          for (int k = 0; k < numInstances; k++) {
+                            if (k != 0)
+                              printf(", ");
+                            printf("%llu", (unsigned long long)values[k]);
+                          }
+                        }
+
+                        printf(")\n");
+                        printf("\t%s (normalized) (%llu * %u) / %u = %llu\n",
+                               eventName, (unsigned long long)sum,
+                               numTotalInstances, numInstances,
+                               (unsigned long long)normalized);
+                    }
+                }
+                free(values);
+              }
+              for (int i = 0; i < tracer->metricData[idx].eventGroups->numEventGroups; i++)
+                tracer->cupti_wrapper_->EventGroupDisable(tracer->metricData[idx].eventGroups->eventGroups[i]);
+          }
+      }
+  } else if (tracer->cupti_mode == 2){
+
+        if (cbid == CUPTI_RUNTIME_TRACE_CBID_cudaLaunch_v3020 &&
+             cbInfo->callbackSite == CUPTI_API_ENTER) {
+          cudaDeviceSynchronize();
+          tracer->cupti_wrapper_->SetEventCollectionMode(cbInfo->context,
+                                                 CUPTI_EVENT_COLLECTION_MODE_KERNEL);
+          for(int i = 0; i < tracer->nb_domains; ++i) {
+              tracer->cupti_wrapper_->EventGroupEnable(tracer->trace[i].eventData.eventGroup);
+          }
+      } else if(cbid == CUPTI_RUNTIME_TRACE_CBID_cudaLaunch_v3020 &&
+          cbInfo->callbackSite == CUPTI_API_EXIT) {
+        cudaDeviceSynchronize();
+
+        for(int i = 0; i < tracer->nb_domains; ++i) {
+            size_t numCountersRead = 0;
+            size_t arraySizeBytes = sizeof(CUpti_EventID) * tracer->trace[i].nb_events;
+            size_t bufferSizeBytes = sizeof(uint64_t) * tracer->trace[i].nb_events;
+
+
+            tracer->cupti_wrapper_->EventGroupReadAllEvents(tracer->trace[i].eventData.eventGroup,
+                                                        CUPTI_EVENT_READ_FLAG_NONE,
+                                                        &bufferSizeBytes,
+                                                        tracer->trace[i].eventVal,
+                                                        &arraySizeBytes,
+                                                        tracer->trace[i].eventData.eventId,
+                                                        &numCountersRead);
+
+        }
+        for(int i = 0; i < tracer->nb_domains; ++i) {
+            tracer->cupti_wrapper_->EventGroupDisable(tracer->trace[i].eventData.eventGroup);
+        }
+    }
+  }
   // API callbacks are invoked synchronously on the thread making the
   // CUDA API call.  If this pointer is non-null then the ScopedAnnotation
   // must be valid.
@@ -819,7 +935,6 @@ void DeviceTracerImpl::AddCorrelationId(uint32 correlation_id,
   } else {
     VLOG(1) << "Unhandled API Callback for " << domain << " " << cbid;
   }
-  std::cout << "ApiCallback exit" << std::endl;
 }
 
 void DeviceTracerImpl::ActivityCallback(const CUpti_Activity &record) {
