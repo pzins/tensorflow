@@ -35,6 +35,7 @@ namespace tensorflow {
 class CancellationManager;
 class GraphDef;
 class OpKernel;
+class ProcessFunctionLibraryRuntime;
 class ResourceMgr;
 class Rendezvous;
 class ScopedStepContainer;
@@ -343,6 +344,11 @@ class FunctionLibraryDefinition : public OpRegistryInterface {
   Status LookUp(const string& op_type_name,
                 const OpRegistrationData** op_reg_data) const override;
 
+  // Ops created for function arguments bear the name given by `kArgOp`; those
+  // created for return values bear the name given by `kRetOp`.
+  static constexpr const char* const kArgOp = "_Arg";
+  static constexpr const char* const kRetOp = "_Retval";
+
   static constexpr const char* const kGradientOp = "SymbolicGradient";
   static constexpr const char* const kFuncAttr = "f";
 
@@ -403,6 +409,8 @@ struct FunctionBody;
 
 // Forward declare. Defined in common_runtime/device.h
 class Device;
+// Forward declare. Defined in common_runtime/device_mgr.h
+class DeviceMgr;
 
 class FunctionLibraryRuntime {
  public:
@@ -517,6 +525,9 @@ class FunctionLibraryRuntime {
   // Returns the device on which the function executes.
   virtual Device* device() = 0;
 
+  // Get the DeviceMgr from which the device was obtained.
+  virtual const DeviceMgr* device_mgr() const = 0;
+
   // Returns the function library definition that backs this runtime.
   // NOTE(mrry): The returned library definition is the default function library
   // for this runtime. The runtime may instantiate functions from separate
@@ -535,6 +546,10 @@ class FunctionLibraryRuntime {
   virtual int graph_def_version() = 0;
 
   typedef uint64 LocalHandle;
+
+  virtual Status Clone(std::unique_ptr<FunctionLibraryDefinition>* out_lib_def,
+                       std::unique_ptr<ProcessFunctionLibraryRuntime>* out_pflr,
+                       FunctionLibraryRuntime** out_flr) = 0;
 };
 
 // Returns a canonicalized string for the instantiation of the

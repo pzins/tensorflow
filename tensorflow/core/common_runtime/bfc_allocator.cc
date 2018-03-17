@@ -538,7 +538,7 @@ void BFCAllocator::AddAllocVisitor(Visitor visitor) {
 
 bool BFCAllocator::TracksAllocationSizes() { return true; }
 
-size_t BFCAllocator::RequestedSize(void* ptr) {
+size_t BFCAllocator::RequestedSize(const void* ptr) {
   mutex_lock l(lock_);
   BFCAllocator::ChunkHandle h = region_manager_.get_handle(ptr);
   CHECK(h != kInvalidChunkHandle)
@@ -547,7 +547,7 @@ size_t BFCAllocator::RequestedSize(void* ptr) {
   return c->requested_size;
 }
 
-size_t BFCAllocator::AllocatedSize(void* ptr) {
+size_t BFCAllocator::AllocatedSize(const void* ptr) {
   mutex_lock l(lock_);
   BFCAllocator::ChunkHandle h = region_manager_.get_handle(ptr);
   CHECK(h != kInvalidChunkHandle)
@@ -556,7 +556,7 @@ size_t BFCAllocator::AllocatedSize(void* ptr) {
   return c->size;
 }
 
-int64 BFCAllocator::AllocationId(void* ptr) {
+int64 BFCAllocator::AllocationId(const void* ptr) {
   mutex_lock l(lock_);
   BFCAllocator::ChunkHandle h = region_manager_.get_handle(ptr);
   CHECK(h != kInvalidChunkHandle)
