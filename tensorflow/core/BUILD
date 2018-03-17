@@ -2323,6 +2323,7 @@ tf_cuda_library(
     srcs = tf_additional_device_tracer_srcs(),
     hdrs = [
         "platform/device_tracer.h",
+        "cuptiTracer.h"
     ],
     copts = tf_copts(),
     cuda_deps = tf_additional_cupti_wrapper_deps() + tf_additional_device_tracer_cuda_deps(),

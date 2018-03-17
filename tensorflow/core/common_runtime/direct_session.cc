@@ -439,48 +439,10 @@ Status DirectSession::DecorateAndPublishGraphForDebug(
   return Status::OK();
 }
 
-Status DirectSession::Run(const RunOptions& run_options,
-                          const NamedTensorList& inputs,
-                          const std::vector<string>& output_names,
-                          const std::vector<string>& target_nodes,
-                          std::vector<Tensor>* outputs,
-                          RunMetadata* run_metadata) {
-  tracepoint(tensorflowTracer, session_start, "");
-  TF_RETURN_IF_ERROR(CheckNotClosed());
-  direct_session_runs->GetCell()->IncrementBy(1);
-  {
-    mutex_lock l(graph_def_lock_);
-    if (!graph_created_) {
-      return errors::InvalidArgument(
-          "Session was not created with a graph before Run()!");
-    }
-  }
-
-  // Extract the inputs names for this run of the session.
-  std::vector<string> input_tensor_names;
-  input_tensor_names.reserve(inputs.size());
-  for (const auto& it : inputs) {
-    input_tensor_names.push_back(it.first);
-  }
-
-  if (run_options.inter_op_thread_pool() < 0 ||
-      run_options.inter_op_thread_pool() >= thread_pools_.size()) {
-    return errors::InvalidArgument("Invalid inter_op_thread_pool: ",
-                                   run_options.inter_op_thread_pool());
-  }
-  thread::ThreadPool* pool =
-      thread_pools_[run_options.inter_op_thread_pool()].first;
-
-  // Check if we already have an executor for these arguments.
-  ExecutorsAndKeys* executors_and_keys;
-  RunStateArgs run_state_args(run_options.debug_options());
-
-  Executor::Args args;
-  args.step_id = step_id_counter_.fetch_add(1);
-
-  TF_RETURN_IF_ERROR(GetOrCreateExecutors(input_tensor_names, output_names,
-                                          target_nodes, &executors_and_keys,
-                                          &run_state_args));
+Status DirectSession::RunInternal(int64 step_id, const RunOptions& run_options,
+                                  CallFrameInterface* call_frame,
+                                  ExecutorsAndKeys* executors_and_keys,
+                                  RunMetadata* run_metadata) {
   const int64 executor_step_count = executors_and_keys->step_count.fetch_add(1);
 
   std::unique_ptr<DebuggerStateInterface> debugger_state;
@@ -676,6 +638,8 @@ Status DirectSession::Run(const RunOptions& run_options,
                           const std::vector<string>& target_nodes,
                           std::vector<Tensor>* outputs,
                           RunMetadata* run_metadata) {
+  int count = direct_session_runs->GetCell()->value();
+  tracepoint(tensorflowTracer, session_start, "session", "DirectSession::Run", count);
   TF_RETURN_IF_ERROR(CheckNotClosed());
   TF_RETURN_IF_ERROR(CheckGraphCreated("Run()"));
   direct_session_runs->GetCell()->IncrementBy(1);
@@ -765,46 +729,7 @@ Status DirectSession::Run(const RunOptions& run_options,
       }
     }
   }
-
-  // Save the output tensors of this run we choose to keep.
-  TF_RETURN_IF_ERROR(
-      run_state.tensor_store.SaveTensors(output_names, &session_state_));
-  if (args.stats_collector) {
-    args.stats_collector->Finalize();
-  }
-
-  // Build and return the cost model as instructed.
-  mutex_lock l(executor_lock_);
-  if (update_cost_model) {
-    // Build the cost model
-    std::unordered_map<string, const Graph*> device_to_graph;
-    for (const PerPartitionExecutorsAndLib& partition :
-         executors_and_keys->items) {
-      const Graph* graph = partition.graph;
-      const string device = partition.flib->device()->name();
-      device_to_graph[device] = graph;
-    }
-    args.stats_collector->BuildCostModel(&cost_model_manager_, device_to_graph);
-
-    // annotate stats onto cost graph.
-    CostGraphDef* cost_graph = run_metadata->mutable_cost_graph();
-    for (const auto& item : executors_and_keys->items) {
-      TF_RETURN_IF_ERROR(
-          cost_model_manager_.AddToCostGraphDef(item.graph, cost_graph));
-    }
-  }
-
-  // If requested via RunOptions, output the partition graphs.
-  if (run_options.output_partition_graphs()) {
-    protobuf::RepeatedPtrField<GraphDef>* partition_graph_defs =
-        run_metadata->mutable_partition_graphs();
-    for (const PerPartitionExecutorsAndLib& exec_and_lib :
-         executors_and_keys->items) {
-      GraphDef* partition_graph_def = partition_graph_defs->Add();
-      exec_and_lib.graph->ToGraphDef(partition_graph_def);
-    }
-  }
-  tracepoint(tensorflowTracer, session_end, "");
+  tracepoint(tensorflowTracer, session_end, "session", "DirectSession::Run", count);
   return Status::OK();
 }
 
