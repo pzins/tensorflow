@@ -127,15 +127,6 @@ class CUPTIClient {
     CUptiResult _status = cupti_wrapper_->call;                     \
     if (_status != CUPTI_SUCCESS) {                                 \
       LOG(ERROR) << "cuda call " << #call << " failed " << _status; \
-      std::cout << (_status==CUPTI_ERROR_NOT_INITIALIZED) \
-      << " " << (_status==CUPTI_ERROR_INVALID_EVENT_ID   ) \
-      << " " << (_status==CUPTI_ERROR_INVALID_METRIC_ID ) \
-      << " " << (_status==CUPTI_ERROR_INVALID_OPERATION)\
-<< " " << (_status==CUPTI_ERROR_PARAMETER_SIZE_NOT_SUFFICIENT)\
-<< " " << (_status==CUPTI_ERROR_INVALID_EVENT_VALUE)\
-<< " " << (_status==CUPTI_ERROR_INVALID_METRIC_VALUE)\
-<< " " << (_status==CUPTI_ERROR_INVALID_PARAMETER)\
-       << std::endl; \
     }                                                               \
   } while (0)
 
@@ -945,16 +936,16 @@ void DeviceTracerImpl::ActivityCallback(const CUpti_Activity &record) {
       CUpti_ActivityAPI *api = (CUpti_ActivityAPI *) &record;
       std::stringstream ss;
       ss << api->cbid;
-      tracepoint(cuptiTracer, driver_api_entry, ss.str().c_str(), api->start);
-      tracepoint(cuptiTracer, driver_api_exit, ss.str().c_str(), api->end);
+      tracepoint(cuptiTracer, driver_api_entry, "driver_api", ss.str().c_str(), api->start);
+      tracepoint(cuptiTracer, driver_api_exit, "driver_api", ss.str().c_str(), api->end);
     //   printf("DRIVER cbid=%u process %u, thread %u, correlation %u\n", api->cbid, api->processId, api->threadId, api->correlationId);
       break;}
     case CUPTI_ACTIVITY_KIND_RUNTIME:{
       CUpti_ActivityAPI *api = (CUpti_ActivityAPI *) &record;
       std::stringstream ss;
       ss << api->cbid;
-      tracepoint(cuptiTracer, runtime_api_entry, ss.str().c_str(), api->start);
-      tracepoint(cuptiTracer, runtime_api_exit, ss.str().c_str(), api->end);
+      tracepoint(cuptiTracer, runtime_api_entry, "runtime_api", ss.str().c_str(), api->start);
+      tracepoint(cuptiTracer, runtime_api_exit, "runtime_api", ss.str().c_str(), api->end);
     //   printf("RUNTIME cbid=%u process %u, thread %u, correlation %u\n", api->cbid, api->processId, api->threadId, api->correlationId);
       break;}
     case CUPTI_ACTIVITY_KIND_MEMCPY: {
@@ -1024,8 +1015,8 @@ Status DeviceTracerImpl::Collect(StepStatsCollector *collector) {
     *nscopy = *ns;
     collector->Save(strings::StrCat(stream_device, "all"), ns);
     collector->Save(strings::StrCat(stream_device, rec.stream_id), nscopy);
-    tracepoint(cuptiTracer, kernel_begin, name.c_str(), start_time);
-    tracepoint(cuptiTracer, kernel_end, name.c_str(), elapsed_us + start_time);
+    tracepoint(cuptiTracer, kernel_begin, "kernels", name.c_str(), start_time);
+    tracepoint(cuptiTracer, kernel_end, "kernels", name.c_str(), elapsed_us + start_time);
   }
   for (const auto &rec : memcpy_records_) {
     auto it = correlations_.find(rec.correlation_id);
@@ -1051,8 +1042,8 @@ Status DeviceTracerImpl::Collect(StepStatsCollector *collector) {
     *nscopy = *ns;
     collector->Save(memcpy_device, ns);
     collector->Save(strings::StrCat(stream_device, rec.stream_id), nscopy);
-    tracepoint(cuptiTracer, memcpy_begin, name.c_str(), details.c_str(), start_time);
-    tracepoint(cuptiTracer, memcpy_end, name.c_str(), details.c_str(), start_time + elapsed_us);
+    tracepoint(cuptiTracer, memcpy_begin, "memcpy", name.c_str(), details.c_str(), start_time);
+    tracepoint(cuptiTracer, memcpy_end, "memcpy", name.c_str(), details.c_str(), start_time + elapsed_us);
   }
   return Status::OK();
 }
