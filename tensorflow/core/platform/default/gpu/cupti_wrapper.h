@@ -89,6 +89,7 @@ class CuptiWrapper {
   CUptiResult EventGetIdFromName(CUdevice device, const char* eventName, CUpti_EventID* event);
   CUptiResult EventGroupCreate(CUcontext context, CUpti_EventGroup* eventGroup, uint32_t flags);
   CUptiResult EventGroupReadAllEvents(CUpti_EventGroup eventGroup, CUpti_ReadEventFlags flags, size_t* eventValueBufferSizeBytes, uint64_t* eventValueBuffer, size_t* eventIdArraySizeBytes, CUpti_EventID* eventIdArray, size_t* numEventIdsRead);
+  CUptiResult cuptiActivityEnableLatencyTimestamps(uint8_t enable);
 
 };
 

@@ -78,18 +78,15 @@ LIBCUPTI_WRAP(cuptiEventGroupGetAttribute);
 LIBCUPTI_WRAP(cuptiEventGroupReadEvent);
 LIBCUPTI_WRAP(cuptiEventGetAttribute);
 LIBCUPTI_WRAP(cuptiEventGroupDisable);
-LIBCUPTI_WRAP(cuptiActivityEnableLatencyTimestamps);
 
 LIBCUPTI_WRAP(cuptiEventGroupAddEvent);
 LIBCUPTI_WRAP(cuptiEventGetIdFromName);
 LIBCUPTI_WRAP(cuptiEventGroupCreate);
 LIBCUPTI_WRAP(cuptiEventGroupReadAllEvents);
+LIBCUPTI_WRAP(cuptiActivityEnableLatencyTimestamps);
 
 } //namespace dynload
 
-CUptiResult CuptiWrapper::ActivityEnableLatencyTimestamps(uint8_t enable) {
-    return dynload::cuptiActivityEnableLatencyTimestamps(enable);
-}
 CUptiResult CuptiWrapper::EventGroupReadAllEvents(CUpti_EventGroup eventGroup, CUpti_ReadEventFlags flags, size_t* eventValueBufferSizeBytes, uint64_t* eventValueBuffer, size_t* eventIdArraySizeBytes, CUpti_EventID* eventIdArray, size_t* numEventIdsRead) {
     return dynload::cuptiEventGroupReadAllEvents(eventGroup, flags, eventValueBufferSizeBytes, eventValueBuffer, eventIdArraySizeBytes, eventIdArray, numEventIdsRead);
 }
@@ -223,6 +220,10 @@ CUptiResult CuptiWrapper::EventGetIdFromName(CUdevice device, const char* eventN
 
 CUptiResult CuptiWrapper::EventGroupCreate(CUcontext context, CUpti_EventGroup* eventGroup, uint32_t flags) {
     return dynload::cuptiEventGroupCreate(context, eventGroup, flags);
+}
+
+CUptiResult CuptiWrapper::ActivityEnableLatencyTimestamps(uint8_t enable) {
+    return dynload::cuptiActivityEnableLatencyTimestamps(enable);
 }
 
 

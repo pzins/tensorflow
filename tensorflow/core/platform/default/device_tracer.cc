@@ -32,9 +32,6 @@ limitations under the License.
 #include "tensorflow/core/platform/tracing.h"
 #include "tensorflow/core/lib/strings/str_util.h"
 
-
-#include <sys/time.h>
-#include <time.h>
 namespace {
 
 // Maps a MemcpyKind enum to a const string.
@@ -290,6 +287,7 @@ CUPTIManager *GetCUPTIManager() {
 // for the duration of the CUPTI API callback.
 TF_STATIC_THREAD_LOCAL_POD(const char *, tls_current_annotation);
 
+
 // User data for event collection callback
 typedef struct MetricData_st {
   // the device where metric is being collected
@@ -374,7 +372,7 @@ class DeviceTracerImpl : public DeviceTracer,
   struct KernelRecord {
     uint64_t start_timestamp;
     uint64_t end_timestamp;
-    uint64_t queud_timestamp;
+    uint64_t queued_timestamp;
     uint64_t submitted_timestamp;
     uint32 device_id;
     uint32 stream_id;
@@ -461,8 +459,14 @@ DeviceTracerImpl::~DeviceTracerImpl() {
   Stop().IgnoreError();
 }
 
-
 Status DeviceTracerImpl::Start() {
+  VLOG(1) << "DeviceTracer::Start";
+  mutex_lock l(mu_);
+  if (enabled_) {
+    return errors::FailedPrecondition("DeviceTracer is already enabled.");
+  }
+  cupti_wrapper_->ActivityEnableLatencyTimestamps(true);
+
     CUresult res = cuCtxGetCurrent(&CUDAcontext);
     res = cuDeviceGet(&CUDAdevice, 0);
     const char* env_p;
@@ -555,31 +559,18 @@ Status DeviceTracerImpl::Start() {
                                         CUPTI_RUNTIME_TRACE_CBID_cudaLaunch_v3020);
 
 
-     }
-
-    VLOG(1) << "GPUTracer::Start";
-    mutex_lock l(mu_);
-    if (enabled_) {
-      return errors::FailedPrecondition("GPUTracer is already enabled.");
-    }
-    // There can only be one CUPTI subscriber.  If we can't create one then
-    // there is another trace in progress (possibly by external code).
-
-    // return Status::OK();
-
-    // CUptiResult ret;
-    // ret = cupti_wrapper_->Subscribe(
-    //     &subscriber_, static_cast<CUpti_CallbackFunc>(ApiCallback), this);
-    // if (ret == CUPTI_ERROR_MAX_LIMIT_REACHED) {
-    //   return errors::Unavailable("CUPTI subcriber limit reached.");
-    // } else if (ret != CUPTI_SUCCESS) {
-    //   return errors::Internal("Failed to create CUPTI subcriber.");
-    // }
-    // std::cout << "success start : " << (res==CUPTI_SUCCESS) << std::endl;
-    // std::cout << "success start : " << (res==CUPTI_ERROR_NOT_INITIALIZED) << std::endl;
-    // std::cout << "success start : " << (res==CUPTI_ERROR_MAX_LIMIT_REACHED)<< std::endl;
-    // std::cout << "success start : " << (res==CUPTI_ERROR_INVALID_PARAMETER)<< std::endl;
-
+     } else {
+      // There can only be one CUPTI subscriber.  If we can't create one then
+      // there is another trace in progress (possibly by external code).
+      CUptiResult ret;
+      ret = cupti_wrapper_->Subscribe(
+          &subscriber_, static_cast<CUpti_CallbackFunc>(ApiCallback), this);
+      if (ret == CUPTI_ERROR_MAX_LIMIT_REACHED) {
+        return errors::Unavailable("CUPTI subcriber limit reached.");
+      } else if (ret != CUPTI_SUCCESS) {
+        return errors::Internal("Failed to create CUPTI subcriber.");
+      }
+  }
 
   // Register as a TraceEngine to receive ScopedAnnotations.
   port::Tracing::RegisterEngine(this);
@@ -623,11 +614,8 @@ Status DeviceTracerImpl::Start() {
   return Status::OK();
 }
 
-
-
-
-
 Status DeviceTracerImpl::Stop() {
+
     if(cupti_mode == 1) {
       unsigned int pass;
       for(int i = 0; i < nb_metrics; ++i) {
@@ -681,11 +669,9 @@ Status DeviceTracerImpl::Stop() {
      displayEventVal(trace, events_str);
 
  }
- // return Status::OK();
 
-      //metrics end --------------------------------------
+
   VLOG(1) << "DeviceTracer::Stop";
-
   mutex_lock l(mu_);
   if (!enabled_) {
     return Status::OK();
@@ -715,15 +701,6 @@ void DeviceTracerImpl::AddCorrelationId(uint32 correlation_id,
   DeviceTracerImpl *tracer = reinterpret_cast<DeviceTracerImpl *>(userdata);
   VLOG(2) << "ApiCallback " << domain << ":" << cbid
           << " func: " << cbInfo->functionName;
-
-  // This callback is enabled only for launch so we shouldn't see
-  // anything else.
-  // if (cbid != CUPTI_RUNTIME_TRACE_CBID_cudaLaunch_v3020) {
-  //     printf("%s:%d: unexpected cbid %d\n", __FILE__, __LINE__, cbid);
-  //     return;
-  //     exit(-1);
-  // }
-
 
   if(tracer->cupti_mode == 1) {
       // on entry, enable all the event groups being collected this pass,
@@ -969,10 +946,13 @@ void DeviceTracerImpl::ActivityCallback(const CUpti_Activity &record) {
     case CUPTI_ACTIVITY_KIND_KERNEL:
     case CUPTI_ACTIVITY_KIND_CONCURRENT_KERNEL: {
       if (kernel_records_.size() >= kMaxRecords) return;
-      auto *kernel = reinterpret_cast<const CUpti_ActivityKernel3 *>(&record);
+      auto *kernel = reinterpret_cast<const CUpti_ActivityKernel4 *>(&record);
       kernel_records_.push_back(KernelRecord{kernel->start, kernel->end,
+                                             kernel->queued, kernel->submitted,
                                              kernel->deviceId, kernel->streamId,
                                              kernel->correlationId});
+    std::cout << "@@@ " << kernel->gridX << " " << kernel->gridY << " " << kernel->gridZ << std::endl;
+    std::cout << "### " << kernel->blockX << " " << kernel->blockY << " " << kernel->blockZ << std::endl;
       break;
     }
     default:
@@ -982,7 +962,6 @@ void DeviceTracerImpl::ActivityCallback(const CUpti_Activity &record) {
 }
 
 Status DeviceTracerImpl::Collect(StepStatsCollector *collector) {
-
   mutex_lock l(mu_);
   if (enabled_) {
     return errors::FailedPrecondition("DeviceTracer is still enabled.");
@@ -1002,6 +981,7 @@ Status DeviceTracerImpl::Collect(StepStatsCollector *collector) {
     const string name = (it != correlations_.cend()) ? it->second : "unknown";
     NodeExecStats *ns = new NodeExecStats;
     int64 start_time = start_walltime_us_ + ((rec.start_timestamp - start_timestamp_) / 1000);
+    int64 queued_time = start_walltime_us_ + ((rec.queued_timestamp - start_timestamp_) / 1000);
     ns->set_all_start_micros(start_time);
     ns->set_op_start_rel_micros(0);
     auto elapsed_us =
@@ -1017,6 +997,7 @@ Status DeviceTracerImpl::Collect(StepStatsCollector *collector) {
     collector->Save(strings::StrCat(stream_device, rec.stream_id), nscopy);
     tracepoint(cuptiTracer, kernel_begin, "kernels", name.c_str(), start_time);
     tracepoint(cuptiTracer, kernel_end, "kernels", name.c_str(), elapsed_us + start_time);
+    tracepoint(cuptiTracer, kernel_queued, "kernels", name.c_str(), queued_time);
   }
   for (const auto &rec : memcpy_records_) {
     auto it = correlations_.find(rec.correlation_id);
