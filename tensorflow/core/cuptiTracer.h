@@ -99,6 +99,21 @@ TRACEPOINT_EVENT(
 
 TRACEPOINT_EVENT(
     cuptiTracer,
+    kernel_queued,
+    TP_ARGS(
+        const char*, cat_arg,
+        const char*, name_arg,
+        uint64_t, timestamp_arg
+    ),
+    TP_FIELDS(
+        ctf_string(cat, cat_arg)
+        ctf_string(name, name_arg)
+        ctf_integer(uint64_t, timestamp, timestamp_arg)
+    )
+)
+
+TRACEPOINT_EVENT(
+    cuptiTracer,
     memcpy_begin,
     TP_ARGS(
         const char*, cat_arg,
