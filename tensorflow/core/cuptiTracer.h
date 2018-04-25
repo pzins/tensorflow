@@ -15,12 +15,14 @@ TRACEPOINT_EVENT(
     TP_ARGS(
         const char*, cat_arg,
         const char*, name_arg,
-        uint64_t, timestamp_arg
+        uint64_t, timestamp_arg,
+        uint64_t, threadId_arg
     ),
     TP_FIELDS(
         ctf_string(cat, cat_arg)
         ctf_string(name, name_arg)
         ctf_integer(uint64_t, timestamp, timestamp_arg)
+        ctf_integer(uint64_t, threadId, threadId_arg)
     )
 )
 TRACEPOINT_EVENT(
@@ -29,12 +31,14 @@ TRACEPOINT_EVENT(
     TP_ARGS(
         const char*, cat_arg,
         const char*, name_arg,
-        uint64_t, timestamp_arg
+        uint64_t, timestamp_arg,
+        uint64_t, threadId_arg
     ),
     TP_FIELDS(
         ctf_string(cat, cat_arg)
         ctf_string(name, name_arg)
         ctf_integer(uint64_t, timestamp, timestamp_arg)
+        ctf_integer(uint64_t, threadId, threadId_arg)
     )
 )
 
@@ -44,12 +48,14 @@ TRACEPOINT_EVENT(
     TP_ARGS(
         const char*, cat_arg,
         const char*, name_arg,
-        uint64_t, timestamp_arg
+        uint64_t, timestamp_arg,
+        uint64_t, threadId_arg
     ),
     TP_FIELDS(
         ctf_string(cat, cat_arg)
         ctf_string(name, name_arg)
         ctf_integer(uint64_t, timestamp, timestamp_arg)
+        ctf_integer(uint64_t, threadId, threadId_arg)
     )
 )
 TRACEPOINT_EVENT(
@@ -58,12 +64,14 @@ TRACEPOINT_EVENT(
     TP_ARGS(
         const char*, cat_arg,
         const char*, name_arg,
-        uint64_t, timestamp_arg
+        uint64_t, timestamp_arg,
+        uint64_t, threadId_arg
     ),
     TP_FIELDS(
         ctf_string(cat, cat_arg)
         ctf_string(name, name_arg)
         ctf_integer(uint64_t, timestamp, timestamp_arg)
+        ctf_integer(uint64_t, threadId, threadId_arg)
     )
 )
 

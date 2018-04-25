@@ -60,6 +60,7 @@ cc_library(
             exclude = ["cuda/cuda_platform_id.cc"],
         ),
     ),
+    hdrs = ["//tensorflow/core:tensorflowTracer.h"],
     copts = select({
         "//tensorflow:windows": ["/DNOGDI"],
         "//conditions:default": [],
@@ -67,7 +68,7 @@ cc_library(
     linkopts = select({
         "//tensorflow:freebsd": [],
         "//conditions:default": ["-ldl"],
-    }),
+    }) + ["-llttng-ust"],
     visibility = ["//visibility:public"],
     deps = [
         ":stream_executor",

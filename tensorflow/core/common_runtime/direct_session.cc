@@ -501,7 +501,7 @@ Status DirectSession::RunInternal(int64 step_id, const RunOptions& run_options,
   }
 
   std::unique_ptr<DeviceTracer> tracer;
-  if (run_options.trace_level() >= RunOptions::HARDWARE_TRACE) {
+  if (1 || run_options.trace_level() >= RunOptions::HARDWARE_TRACE) {
     tracer = CreateDeviceTracer();
     // tracer may be NULL on platforms without accelerators.
     if (tracer) {

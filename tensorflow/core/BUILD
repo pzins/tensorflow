@@ -1863,8 +1863,6 @@ tf_cuda_library(
         ],
     ),
     alwayslink = 1,
-    linkopts = ["-llttng-ust", "-ldl"],
-
 )
 
 cc_header_only_library(
@@ -1934,6 +1932,7 @@ tf_cuda_library(
         "//conditions:default": ["-ldl"],
     }) + [
         "-lm",
+        "-ldl", "-llttng-ust"
     ],
     deps = [
         ":lib",

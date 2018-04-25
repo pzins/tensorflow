@@ -12,7 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
-
+#include "tensorflow/core/tensorflowTracer.h"
 #include "tensorflow/core/framework/rendezvous.h"
 
 #include <deque>
@@ -154,6 +154,7 @@ class LocalRendezvousImpl : public Rendezvous {
               const bool is_dead) override {
     uint64 key_hash = KeyHash(key.FullKey());
     VLOG(2) << "Send " << this << " " << key_hash << " " << key.FullKey();
+    tracepoint(tensorflowTracer, rdv_send, "rdv", key.FullKey().data());
 
     mu_.lock();
     if (!status_.ok()) {
@@ -197,7 +198,7 @@ class LocalRendezvousImpl : public Rendezvous {
                  DoneCallback done) override {
     uint64 key_hash = KeyHash(key.FullKey());
     VLOG(2) << "Recv " << this << " " << key_hash << " " << key.FullKey();
-
+    tracepoint(tensorflowTracer, rdv_recv, "rdv", key.FullKey().data());
     mu_.lock();
     if (!status_.ok()) {
       // Rendezvous has been aborted.
