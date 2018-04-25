@@ -1,16 +1,16 @@
 #undef TRACEPOINT_PROVIDER
-#define TRACEPOINT_PROVIDER cuptiTracer
+#define TRACEPOINT_PROVIDER cudaTracer
 
 #undef TRACEPOINT_INCLUDE
-#define TRACEPOINT_INCLUDE "./cuptiTracer.h"
+#define TRACEPOINT_INCLUDE "./cudaTracer.h"
 
-#if !defined(_cuptiTracer_H) || defined(TRACEPOINT_HEADER_MULTI_READ)
-#define _cuptiTracer_H
+#if !defined(_cudaTracer_H) || defined(TRACEPOINT_HEADER_MULTI_READ)
+#define _cudaTracer_H
 
 #include <lttng/tracepoint.h>
 
 TRACEPOINT_EVENT(
-    cuptiTracer,
+    cudaTracer,
     runtime_api_entry,
     TP_ARGS(
         const char*, cat_arg,
@@ -26,7 +26,7 @@ TRACEPOINT_EVENT(
     )
 )
 TRACEPOINT_EVENT(
-    cuptiTracer,
+    cudaTracer,
     runtime_api_exit,
     TP_ARGS(
         const char*, cat_arg,
@@ -43,7 +43,7 @@ TRACEPOINT_EVENT(
 )
 
 TRACEPOINT_EVENT(
-    cuptiTracer,
+    cudaTracer,
     driver_api_entry,
     TP_ARGS(
         const char*, cat_arg,
@@ -59,7 +59,7 @@ TRACEPOINT_EVENT(
     )
 )
 TRACEPOINT_EVENT(
-    cuptiTracer,
+    cudaTracer,
     driver_api_exit,
     TP_ARGS(
         const char*, cat_arg,
@@ -76,7 +76,7 @@ TRACEPOINT_EVENT(
 )
 
 TRACEPOINT_EVENT(
-    cuptiTracer,
+    cudaTracer,
     kernel_begin,
     TP_ARGS(
         const char*, cat_arg,
@@ -91,7 +91,7 @@ TRACEPOINT_EVENT(
 )
 
 TRACEPOINT_EVENT(
-    cuptiTracer,
+    cudaTracer,
     kernel_end,
     TP_ARGS(
         const char*, cat_arg,
@@ -106,7 +106,7 @@ TRACEPOINT_EVENT(
 )
 
 TRACEPOINT_EVENT(
-    cuptiTracer,
+    cudaTracer,
     kernel_queued,
     TP_ARGS(
         const char*, cat_arg,
@@ -121,7 +121,7 @@ TRACEPOINT_EVENT(
 )
 
 TRACEPOINT_EVENT(
-    cuptiTracer,
+    cudaTracer,
     memcpy_begin,
     TP_ARGS(
         const char*, cat_arg,
@@ -137,7 +137,7 @@ TRACEPOINT_EVENT(
     )
 )
 TRACEPOINT_EVENT(
-    cuptiTracer,
+    cudaTracer,
     memcpy_end,
     TP_ARGS(
         const char*, cat_arg,

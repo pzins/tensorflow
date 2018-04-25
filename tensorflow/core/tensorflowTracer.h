@@ -9,32 +9,10 @@
 
 #include <lttng/tracepoint.h>
 
-TRACEPOINT_EVENT(
-    tensorflowTracer,
-    rdv_send,
-    TP_ARGS(
-        const char*, cat_arg,
-        const char*, name_arg
-    ),
-    TP_FIELDS(
-        ctf_string(cat, cat_arg)
-        ctf_string(name, name_arg)
-    )
-)
-TRACEPOINT_EVENT(
-    tensorflowTracer,
-    rdv_recv,
-    TP_ARGS(
-        const char*, cat_arg,
-        const char*, name_arg
-    ),
-    TP_FIELDS(
-        ctf_string(cat, cat_arg)
-        ctf_string(name, name_arg)
-    )
-)
 
 // Tracepoints : entry / exit
+
+// TensorFlow scheduler
 TRACEPOINT_EVENT(
     tensorflowTracer,
     process_entry,
@@ -118,6 +96,7 @@ TRACEPOINT_EVENT(
 
 
 // Tracepoints : start / end
+// TensorFlow session
 TRACEPOINT_EVENT(
     tensorflowTracer,
     session_start,
@@ -147,6 +126,7 @@ TRACEPOINT_EVENT(
     )
 )
 
+// TensorFlow sync operations
 TRACEPOINT_EVENT(
     tensorflowTracer,
     operation_start,
@@ -176,6 +156,7 @@ TRACEPOINT_EVENT(
     )
 )
 
+// TensorFlow async operations
 TRACEPOINT_EVENT(
     tensorflowTracer,
     async_operation_start,
@@ -205,10 +186,35 @@ TRACEPOINT_EVENT(
     )
 )
 
-
+// TensorFlow send / recv operations with Rendezvous
+TRACEPOINT_EVENT(
+    tensorflowTracer,
+    rdv_send,
+    TP_ARGS(
+        const char*, cat_arg,
+        const char*, name_arg
+    ),
+    TP_FIELDS(
+        ctf_string(cat, cat_arg)
+        ctf_string(name, name_arg)
+    )
+)
+TRACEPOINT_EVENT(
+    tensorflowTracer,
+    rdv_recv,
+    TP_ARGS(
+        const char*, cat_arg,
+        const char*, name_arg
+    ),
+    TP_FIELDS(
+        ctf_string(cat, cat_arg)
+        ctf_string(name, name_arg)
+    )
+)
 
 
 // Tracepoints : XY chart
+// BFC allocator statistics
 TRACEPOINT_EVENT(
     tensorflowTracer,
     bfc_allocator_stats,
@@ -228,6 +234,7 @@ TRACEPOINT_EVENT(
     )
 )
 
+// BFC allocator, chunks statistics
 TRACEPOINT_EVENT(
     tensorflowTracer,
     bfc_chunks_stats,
@@ -257,6 +264,7 @@ TRACEPOINT_EVENT(
     )
 )
 
+// BFC allocator, bins statistics
 TRACEPOINT_EVENT(
     tensorflowTracer,
     bfc_bins_stats,
@@ -280,6 +288,7 @@ TRACEPOINT_EVENT(
     )
 )
 
+// GPU driver memory allocation / deallocation
 TRACEPOINT_EVENT(
     tensorflowTracer,
     memory_allocate,

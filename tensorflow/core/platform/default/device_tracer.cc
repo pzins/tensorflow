@@ -12,7 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
-#include "tensorflow/core/cuptiTracer.h"
+#include "tensorflow/core/cudaTracer.h"
 #include "tensorflow/core/platform/device_tracer.h"
 #include <sstream>
 #if GOOGLE_CUDA
@@ -465,6 +465,7 @@ Status DeviceTracerImpl::Start() {
   if (enabled_) {
     return errors::FailedPrecondition("DeviceTracer is already enabled.");
   }
+  /*
   cupti_wrapper_->ActivityEnableLatencyTimestamps(true);
 
     CUresult res = cuCtxGetCurrent(&CUDAcontext);
@@ -560,6 +561,7 @@ Status DeviceTracerImpl::Start() {
 
 
      } else {
+     */
       // There can only be one CUPTI subscriber.  If we can't create one then
       // there is another trace in progress (possibly by external code).
       CUptiResult ret;
@@ -570,7 +572,7 @@ Status DeviceTracerImpl::Start() {
       } else if (ret != CUPTI_SUCCESS) {
         return errors::Internal("Failed to create CUPTI subcriber.");
       }
-  }
+  // }
 
   // Register as a TraceEngine to receive ScopedAnnotations.
   port::Tracing::RegisterEngine(this);
@@ -615,6 +617,7 @@ Status DeviceTracerImpl::Start() {
 }
 
 Status DeviceTracerImpl::Stop() {
+    /*
     if(cupti_mode == 1) {
       unsigned int pass;
       for(int i = 0; i < nb_metrics; ++i) {
@@ -668,7 +671,7 @@ Status DeviceTracerImpl::Stop() {
      displayEventVal(trace, events_str);
 
  }
-
+*/
   VLOG(1) << "DeviceTracer::Stop";
   mutex_lock l(mu_);
   if (!enabled_) {
@@ -700,6 +703,7 @@ void DeviceTracerImpl::AddCorrelationId(uint32 correlation_id,
   VLOG(2) << "ApiCallback " << domain << ":" << cbid
           << " func: " << cbInfo->functionName;
 
+/*
   if(tracer->cupti_mode == 1) {
       // on entry, enable all the event groups being collected this pass,
       // for metrics we collect for all instances of the event
@@ -853,6 +857,7 @@ void DeviceTracerImpl::AddCorrelationId(uint32 correlation_id,
         }
     }
   }
+  */
   // API callbacks are invoked synchronously on the thread making the
   // CUDA API call.  If this pointer is non-null then the ScopedAnnotation
   // must be valid.
@@ -911,16 +916,16 @@ void DeviceTracerImpl::ActivityCallback(const CUpti_Activity &record) {
       CUpti_ActivityAPI *api = (CUpti_ActivityAPI *) &record;
       std::stringstream ss;
       ss << api->cbid;
-      tracepoint(cuptiTracer, driver_api_entry, "driver_api", ss.str().c_str(), api->start, api->threadId);
-      tracepoint(cuptiTracer, driver_api_exit, "driver_api", ss.str().c_str(), api->end, api->threadId);
+      tracepoint(cudaTracer, driver_api_entry, "driver_api", ss.str().c_str(), api->start, api->threadId);
+      tracepoint(cudaTracer, driver_api_exit, "driver_api", ss.str().c_str(), api->end, api->threadId);
     //   printf("DRIVER cbid=%u process %u, thread %u, correlation %u\n", api->cbid, api->processId, api->threadId, api->correlationId);
       break;}
     case CUPTI_ACTIVITY_KIND_RUNTIME:{
       CUpti_ActivityAPI *api = (CUpti_ActivityAPI *) &record;
       std::stringstream ss;
       ss << api->cbid;
-      tracepoint(cuptiTracer, runtime_api_entry, "runtime_api", ss.str().c_str(), api->start, api->threadId);
-      tracepoint(cuptiTracer, runtime_api_exit, "runtime_api", ss.str().c_str(), api->end, api->threadId);
+      tracepoint(cudaTracer, runtime_api_entry, "runtime_api", ss.str().c_str(), api->start, api->threadId);
+      tracepoint(cudaTracer, runtime_api_exit, "runtime_api", ss.str().c_str(), api->end, api->threadId);
     //   printf("RUNTIME cbid=%u process %u, thread %u, correlation %u\n", api->cbid, api->processId, api->threadId, api->correlationId);
       break;}
     case CUPTI_ACTIVITY_KIND_MEMCPY: {
@@ -993,9 +998,9 @@ Status DeviceTracerImpl::Collect(StepStatsCollector *collector) {
         collector->Save(strings::StrCat(stream_device, "all"), ns);
         collector->Save(strings::StrCat(stream_device, rec.stream_id), nscopy);
     }
-    tracepoint(cuptiTracer, kernel_begin, "kernels", name.c_str(), start_time);
-    tracepoint(cuptiTracer, kernel_end, "kernels", name.c_str(), elapsed_us + start_time);
-    tracepoint(cuptiTracer, kernel_queued, "kernels", name.c_str(), queued_time);
+    tracepoint(cudaTracer, kernel_begin, "kernels", name.c_str(), start_time);
+    tracepoint(cudaTracer, kernel_end, "kernels", name.c_str(), elapsed_us + start_time);
+    tracepoint(cudaTracer, kernel_queued, "kernels", name.c_str(), queued_time);
   }
   for (const auto &rec : memcpy_records_) {
     auto it = correlations_.find(rec.correlation_id);
@@ -1023,8 +1028,8 @@ Status DeviceTracerImpl::Collect(StepStatsCollector *collector) {
         collector->Save(memcpy_device, ns);
         collector->Save(strings::StrCat(stream_device, rec.stream_id), nscopy);
     }
-    tracepoint(cuptiTracer, memcpy_begin, "memcpy", name.c_str(), details.c_str(), start_time);
-    tracepoint(cuptiTracer, memcpy_end, "memcpy", name.c_str(), details.c_str(), start_time + elapsed_us);
+    tracepoint(cudaTracer, memcpy_begin, "memcpy", name.c_str(), details.c_str(), start_time);
+    tracepoint(cudaTracer, memcpy_end, "memcpy", name.c_str(), details.c_str(), start_time + elapsed_us);
   }
   return Status::OK();
 }

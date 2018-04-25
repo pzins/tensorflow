@@ -684,10 +684,10 @@ void BFCAllocator::Profile() {
        CHECK_EQ(b->free_chunks.size(),
                 bin_info.total_chunks_in_bin - bin_info.total_chunks_in_use);
 
-        // tracepoint(tensorflowTracer, bfc_bins_stats, Name().c_str(), bin_num,
-        //     bin_info.total_chunks_in_bin, bin_info.total_chunks_in_use,
-        //     bin_info.total_bytes_in_bin, bin_info.total_bytes_in_use,
-        //     bin_info.total_requested_bytes_in_use);
+        tracepoint(tensorflowTracer, bfc_bins_stats, Name().c_str(), bin_num,
+            bin_info.total_chunks_in_bin, bin_info.total_chunks_in_use,
+            bin_info.total_bytes_in_bin, bin_info.total_bytes_in_use,
+            bin_info.total_requested_bytes_in_use);
      }
 }
 

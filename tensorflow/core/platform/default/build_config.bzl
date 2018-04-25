@@ -408,7 +408,7 @@ def tf_additional_cupti_wrapper_deps():
   return ["//tensorflow/core/platform/default/gpu:cupti_wrapper"]
 
 def tf_additional_device_tracer_srcs():
-  return ["platform/default/device_tracer.cc", "cuptiTracer.o"]
+  return ["platform/default/device_tracer.cc", "cudaTracer.o"]
 
 def tf_additional_device_tracer_cuda_deps():
   return []
