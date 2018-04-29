@@ -68,6 +68,8 @@ class DeviceTracer {
   // StepStatsCollector.  Does not clear any existing stats.
   // It is an error to call 'Collect' while a trace is running.
   virtual Status Collect(StepStatsCollector* collector) = 0;
+
+  virtual Status CollectLttng() = 0;
 };
 
 // Creates a platform-specific DeviceTracer.
