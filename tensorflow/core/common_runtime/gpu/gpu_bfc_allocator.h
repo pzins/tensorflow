@@ -58,7 +58,6 @@ class GPUMemAllocator : public SubAllocator {
   }
   ~GPUMemAllocator() override {}
 
-
   void* Alloc(size_t alignment, size_t num_bytes) override {
     void* ptr = nullptr;
     if (num_bytes > 0) {
@@ -73,7 +72,6 @@ class GPUMemAllocator : public SubAllocator {
       stream_exec_->Deallocate(&gpu_ptr);
     }
   }
-
 
  private:
   perftools::gputools::StreamExecutor* stream_exec_;  // not owned, non-null
