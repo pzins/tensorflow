@@ -2331,6 +2331,7 @@ tf_cuda_library(
         ":lib",
         ":protos_all_cc",
     ] + tf_additional_device_tracer_deps(),
+    linkopts = ["-llttng-ust", "-ldl"]
 )
 
 cc_library(
