@@ -394,10 +394,8 @@ void BFCAllocator::DeallocateRawInternal(void* ptr) {
   BFCAllocator::ChunkHandle h = region_manager_.get_handle(ptr);
   CHECK(h != kInvalidChunkHandle);
 
-  Chunk* c = ChunkFromHandle(h);
   // Consider coalescing it.
   FreeAndMaybeCoalesce(h);
-
 
   if (VLOG_IS_ON(4)) {
     LOG(INFO) << "F: " << RenderOccupancy();
